@@ -10,8 +10,8 @@ import { ApiErrorResponse } from "../../types/api.types";
 export default function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [firstname, setFirstName] = useState("");
+  const [lastname, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,8 +33,8 @@ export default function SignUpForm() {
     }
     
     registerMutation.mutate({
-      firstName,
-      lastName,
+      firstname,
+      lastname,
       email,
       password,
       confirmPassword,
@@ -141,7 +141,7 @@ export default function SignUpForm() {
                       id="fname"
                       name="fname"
                       placeholder="Enter your first name"
-                      value={firstName}
+                      value={firstname}
                       onChange={(e) => setFirstName(e.target.value)}
                       disabled={registerMutation.isPending}
                     />
@@ -156,7 +156,7 @@ export default function SignUpForm() {
                       id="lname"
                       name="lname"
                       placeholder="Enter your last name"
-                      value={lastName}
+                      value={lastname}
                       onChange={(e) => setLastName(e.target.value)}
                       disabled={registerMutation.isPending}
                     />
@@ -201,6 +201,19 @@ export default function SignUpForm() {
                       )}
                     </span>
                   </div>
+                </div>
+                {/* <!-- Confirm Password --> */}
+                <div>
+                  <Label>
+                    Confirm Password<span className="text-error-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Confirm your password"
+                    type={showPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={registerMutation.isPending}
+                  />
                 </div>
                 {/* <!-- Checkbox --> */}
                 <div className="flex items-center gap-3">
