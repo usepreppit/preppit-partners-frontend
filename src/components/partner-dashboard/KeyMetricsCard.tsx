@@ -36,7 +36,7 @@ export default function KeyMetricsCard({
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Candidates */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
               <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
@@ -54,7 +54,7 @@ export default function KeyMetricsCard({
           </div>
 
           {/* Completed Sessions */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
               <CheckCircleIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
             </div>
@@ -72,7 +72,7 @@ export default function KeyMetricsCard({
           </div>
 
           {/* Average Score */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
               <ShootingStarIcon className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
             </div>

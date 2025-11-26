@@ -2,6 +2,8 @@ import NextStepsCard from '../../components/common/NextStepsCard';
 import KeyMetricsCard from '../../components/partner-dashboard/KeyMetricsCard';
 import FinanceCard from '../../components/partner-dashboard/FinanceCard';
 import PracticeOverviewCard from '../../components/partner-dashboard/PracticeOverviewCard';
+import RevenueSpendChart from '../../components/partner-dashboard/RevenueSpendChart';
+import CandidatesGrowthChart from '../../components/partner-dashboard/CandidatesGrowthChart';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function PartnerDashboard() {
@@ -75,27 +77,31 @@ export default function PartnerDashboard() {
       {/* Practice Sessions Overview */}
       <PracticeOverviewCard {...mockData.practice} />
 
-      {/* Charts Section - TODO: Add charts for revenue trends, session analytics */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Revenue and Spend */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Revenue Trends</h3>
+            <h3 className="card-title">Monthly Revenue & Spend</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Track your income vs expenses over time
+            </p>
           </div>
           <div className="card-body">
-            <div className="h-64 flex items-center justify-center text-gray-400">
-              <p>Chart coming soon...</p>
-            </div>
+            <RevenueSpendChart currency={mockData.finance.currency} />
           </div>
         </div>
 
+        {/* Candidates Growth */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Session Analytics</h3>
+            <h3 className="card-title">Candidates Growth</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Total candidates added each month
+            </p>
           </div>
           <div className="card-body">
-            <div className="h-64 flex items-center justify-center text-gray-400">
-              <p>Chart coming soon...</p>
-            </div>
+            <CandidatesGrowthChart />
           </div>
         </div>
       </div>

@@ -43,7 +43,7 @@ export default function FinanceCard({
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Revenue */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
               <DollarLineIcon className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
             </div>
@@ -61,7 +61,7 @@ export default function FinanceCard({
           </div>
 
           {/* Pending Payments */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
               <BoxIcon className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
@@ -75,7 +75,7 @@ export default function FinanceCard({
           </div>
 
           {/* Average Session Cost */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
               <ArrowUpIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>

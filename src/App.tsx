@@ -5,6 +5,11 @@ import Crm from "./pages/Dashboard/Crm";
 import Marketing from "./pages/Dashboard/Marketing";
 import Analytics from "./pages/Dashboard/Analytics";
 import PartnerDashboard from "./pages/Dashboard/PartnerDashboard";
+import Candidates from "./pages/Partner/Candidates";
+import Exams from "./pages/Partner/Exams";
+import Finances from "./pages/Partner/Finances";
+import Subscriptions from "./pages/Partner/Subscriptions";
+import Support from "./pages/Partner/Support";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -82,6 +87,11 @@ export default function App() {
             >
               <Route index path="/" element={<Ecommerce />} />
               <Route path="/partner-dashboard" element={<PartnerDashboard />} />
+              <Route path="/candidates" element={<Candidates />} />
+              <Route path="/exams" element={<Exams />} />
+              <Route path="/finances" element={<Finances />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/marketing" element={<Marketing />} />
               <Route path="/crm" element={<Crm />} />

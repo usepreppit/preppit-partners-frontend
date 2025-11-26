@@ -43,7 +43,7 @@ export default function PracticeOverviewCard({
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Practice Sessions */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
               <TaskIcon className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             </div>
@@ -61,7 +61,7 @@ export default function PracticeOverviewCard({
           </div>
 
           {/* Average Duration */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
               <TimeIcon className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
             </div>
@@ -75,7 +75,7 @@ export default function PracticeOverviewCard({
           </div>
 
           {/* Feedback Responses */}
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
             <div className="flex-shrink-0 w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
               <ChatIcon className="w-6 h-6 text-pink-600 dark:text-pink-400" />
             </div>

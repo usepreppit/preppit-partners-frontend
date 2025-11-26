@@ -18,9 +18,15 @@ import {
   TableIcon,
   TaskIcon,
   UserCircleIcon,
+  UserIcon,
+  FileIcon,
+  DollarLineIcon,
+  BoxIcon,
+  InfoIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
+import { useAuth } from "../hooks/useAuth";
 
 type NavItem = {
   name: string;
@@ -29,6 +35,54 @@ type NavItem = {
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
 };
 
+// Partner-specific navigation
+const partnerNavItems: NavItem[] = [
+  {
+    icon: <GridIcon />,
+    name: "Dashboard",
+    path: "/partner-dashboard",
+  },
+  {
+    icon: <UserIcon />,
+    name: "Candidates",
+    path: "/candidates",
+  },
+  {
+    icon: <FileIcon />,
+    name: "Exams",
+    path: "/exams",
+  },
+  {
+    icon: <DollarLineIcon />,
+    name: "Finances",
+    path: "/finances",
+  },
+  {
+    icon: <BoxIcon />,
+    name: "Subscriptions",
+    path: "/subscriptions",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Analytics",
+    path: "/analytics",
+  },
+];
+
+const partnerSupportItems: NavItem[] = [
+  {
+    icon: <InfoIcon />,
+    name: "Support",
+    path: "/support",
+  },
+  {
+    icon: <ChatIcon />,
+    name: "Chat",
+    path: "/chat",
+  },
+];
+
+// Default navigation (existing)
 const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
@@ -172,6 +226,7 @@ const supportItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
+  const { user } = useAuth();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "support" | "others";
@@ -181,6 +236,11 @@ const AppSidebar: React.FC = () => {
     {}
   );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Determine which navigation items to use based on user account type
+  const isPartner = user?.account_type === 'partner';
+  const currentNavItems = isPartner ? partnerNavItems : navItems;
+  const currentSupportItems = isPartner ? partnerSupportItems : supportItems;
 
   // const isActive = (path: string) => location.pathname === path;
   const isActive = useCallback(
@@ -193,9 +253,9 @@ const AppSidebar: React.FC = () => {
     ["main", "support", "others"].forEach((menuType) => {
       const items =
         menuType === "main"
-          ? navItems
+          ? currentNavItems
           : menuType === "support"
-          ? supportItems
+          ? currentSupportItems
           : othersItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
@@ -215,7 +275,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [location, isActive]);
+  }, [location, isActive, currentNavItems, currentSupportItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -436,7 +496,7 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
-              {renderMenuItems(navItems, "main")}
+              {renderMenuItems(currentNavItems, "main")}
             </div>
             <div className="">
               <h2
@@ -452,24 +512,26 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(supportItems, "support")}
+              {renderMenuItems(currentSupportItems, "support")}
             </div>
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(othersItems, "others")}
-            </div>
+            {!isPartner && (
+              <div className="">
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "Others"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(othersItems, "others")}
+              </div>
+            )}
           </div>
         </nav>
         {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}

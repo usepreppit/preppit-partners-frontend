@@ -50,7 +50,30 @@ The Partner Dashboard provides a comprehensive view of partner performance metri
   - Session trend indicators
   - Clean icon-based design
 
-### 5. PartnerDashboard (`src/pages/Dashboard/PartnerDashboard.tsx`)
+### 5. RevenueSpendChart (`src/components/partner-dashboard/RevenueSpendChart.tsx`)
+- **Purpose**: Visualize monthly revenue vs spend trends
+- **Chart Type**: Area chart with dual data series
+- **Features**:
+  - Green area for revenue, red area for spend
+  - Smooth curve interpolation
+  - Gradient fill for visual appeal
+  - Currency formatting (respects partner's preferred currency)
+  - 12-month view (Jan-Dec)
+  - Interactive tooltips with formatted values
+  - Responsive design
+
+### 6. CandidatesGrowthChart (`src/components/partner-dashboard/CandidatesGrowthChart.tsx`)
+- **Purpose**: Track candidate acquisition over time
+- **Chart Type**: Column/bar chart
+- **Features**:
+  - Blue gradient bars for visual hierarchy
+  - Data labels showing exact values
+  - 12-month growth visualization
+  - Tooltips with candidate counts
+  - Responsive layout
+  - Clean, modern design
+
+### 7. PartnerDashboard (`src/pages/Dashboard/PartnerDashboard.tsx`)
 - **Purpose**: Main partner dashboard page
 - **Layout**:
   - Welcome header with personalized greeting
@@ -58,12 +81,13 @@ The Partner Dashboard provides a comprehensive view of partner performance metri
   - Key metrics section
   - Financial overview
   - Practice sessions overview
-  - Placeholder sections for future charts
+  - **Monthly Revenue & Spend Chart**
+  - **Candidates Growth Chart**
 - **Features**:
   - Pulls partner name from `user.partnerProfile.contact_person_name`
   - Uses mock data (TODO: integrate with actual API)
   - Responsive grid layout
-  - Chart placeholders for future analytics
+  - Interactive charts with real-time data visualization
 
 ## Routing
 
@@ -135,8 +159,12 @@ All components use icons from `src/icons/index.ts`:
       link: '/settings/payment',
     },
   ],
+  charts: {
+    revenueData: [12500, 15200, 18400, 16800, 21500, 24300, 28700, 31200, 29800, 35400, 38900, 42100],
+    spendData: [8200, 9100, 10500, 9800, 11200, 12800, 14500, 15800, 14200, 16700, 18200, 19500],
+    candidatesGrowth: [12, 18, 25, 32, 45, 58, 72, 89, 105, 128, 142, 156],
+  },
 }
-```
 
 ## Styling
 
@@ -146,6 +174,14 @@ All components use the existing design system:
 - **Responsive design**: Mobile-first with breakpoints
 - **Icon backgrounds**: Colored accent boxes for visual hierarchy
 - **Grid layouts**: Tailwind CSS grid system
+- **Charts**: ApexCharts with custom theming and responsive configurations
+
+### Chart Styling
+- **Revenue Chart**: Green (#10B981) for revenue, Red (#EF4444) for spend
+- **Candidates Chart**: Blue gradient (#3B82F6)
+- **Grid Lines**: Light gray with dashed lines
+- **Tooltips**: Custom currency and number formatting
+- **Fonts**: Outfit sans-serif for consistency
 
 ## Integration Points
 
@@ -166,31 +202,64 @@ export const partnerDashboardService = {
   getFinancials: () => apiClient.get('/partner/financials'),
   getPracticeSessions: () => apiClient.get('/partner/practice-sessions'),
   getNextSteps: () => apiClient.get('/partner/next-steps'),
+  getRevenueSpendData: () => apiClient.get('/partner/charts/revenue-spend'),
+  getCandidatesGrowth: () => apiClient.get('/partner/charts/candidates-growth'),
 };
 ```
+
+## Charts Implementation
+
+### Monthly Revenue & Spend Chart
+- **Type**: Area chart with dual series
+- **Data Points**: 12 months (January to December)
+- **Revenue Series**: Green area with gradient fill
+- **Spend Series**: Red area with gradient fill
+- **Features**:
+  - Currency formatting based on partner's preferred currency
+  - Smooth curve interpolation
+  - Interactive tooltips
+  - Responsive height (350px)
+  - Grid lines for better readability
+  - Compact notation for large numbers (e.g., $45K)
+
+### Candidates Growth Chart
+- **Type**: Column/Bar chart
+- **Data Points**: 12 months showing cumulative or monthly additions
+- **Features**:
+  - Blue gradient bars
+  - Data labels on top of each bar
+  - Tooltip showing candidate count
+  - Y-axis with integer values only
+  - Responsive height (350px)
+  - Clean, modern design
 
 ## Next Steps for Enhancement
 
 1. **Real API Integration**
    - Replace mock data with actual API calls
-   - Add loading states
-   - Add error handling
+   - Add loading states with skeleton screens
+   - Add error handling with user-friendly messages
+   - Implement data refetching on intervals
 
-2. **Chart Components**
-   - Revenue trends line chart
-   - Session analytics bar chart
-   - Feedback sentiment analysis
+2. **Chart Enhancements**
+   - Add date range selector (7 days, 30 days, 3 months, 12 months)
+   - Export chart data to CSV/PDF
+   - Add comparison mode (year-over-year)
+   - Drill-down capability for detailed views
+   - Real-time data updates
 
 3. **Advanced Features**
-   - Date range filters
-   - Export functionality
-   - Drill-down details
-   - Real-time updates
+   - Dashboard customization (drag-and-drop widgets)
+   - Predictive analytics and forecasting
+   - Alerts and notifications for key metrics
+   - Custom reports generation
+   - Multi-partner comparison (for admins)
 
 4. **Next Steps Tracking**
    - Dynamic step completion detection
    - Progress indicators
    - Completion celebrations
+   - Contextual help and tutorials
 
 ## File Structure
 
@@ -202,11 +271,13 @@ src/
 │   └── partner-dashboard/
 │       ├── KeyMetricsCard.tsx
 │       ├── FinanceCard.tsx
-│       └── PracticeOverviewCard.tsx
+│       ├── PracticeOverviewCard.tsx
+│       ├── RevenueSpendChart.tsx (new)
+│       └── CandidatesGrowthChart.tsx (new)
 ├── pages/
 │   └── Dashboard/
 │       ├── Ecommerce.tsx (modified)
-│       └── PartnerDashboard.tsx
+│       └── PartnerDashboard.tsx (updated with charts)
 └── App.tsx (modified)
 ```
 
@@ -215,7 +286,12 @@ src/
 - [ ] Dashboard loads without errors
 - [ ] Metrics display correctly
 - [ ] Currency formatting works
-- [ ] Dark mode styling is correct
+- [ ] Charts render correctly with mock data
+- [ ] Chart tooltips work on hover
+- [ ] Revenue & spend chart shows correct colors
+- [ ] Candidates growth chart displays bars correctly
+- [ ] Charts are responsive on mobile/tablet
+- [ ] Dark mode styling is correct for all components
 - [ ] Responsive layout on mobile/tablet
 - [ ] Partner auto-redirect works
 - [ ] Next steps card shows/hides properly
@@ -229,4 +305,6 @@ src/
 - All components support dark mode
 - Currency formatting uses Intl.NumberFormat for localization
 - Percentage changes support positive/negative/neutral states
+- Charts use ApexCharts library for interactive visualizations
+- Mock data is used for charts (ready for API integration)
 - Next steps card intelligently filters and hides when complete
