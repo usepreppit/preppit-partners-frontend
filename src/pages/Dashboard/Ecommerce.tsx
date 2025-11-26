@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router";
+import { useAuth } from "../../hooks/useAuth";
 import EcommerceMetrics from "../../components/ecommerce/EcommerceMetrics";
 import MonthlySalesChart from "../../components/ecommerce/MonthlySalesChart";
 import StatisticsChart from "../../components/ecommerce/StatisticsChart";
@@ -7,6 +10,16 @@ import DemographicCard from "../../components/ecommerce/DemographicCard";
 import PageMeta from "../../components/common/PageMeta";
 
 export default function Ecommerce() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect partners to their dedicated dashboard
+  useEffect(() => {
+    if (user?.account_type === 'partner') {
+      navigate('/partner-dashboard');
+    }
+  }, [user, navigate]);
+
   return (
     <>
       <PageMeta

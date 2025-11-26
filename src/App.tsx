@@ -4,6 +4,7 @@ import Stocks from "./pages/Dashboard/Stocks";
 import Crm from "./pages/Dashboard/Crm";
 import Marketing from "./pages/Dashboard/Marketing";
 import Analytics from "./pages/Dashboard/Analytics";
+import PartnerDashboard from "./pages/Dashboard/PartnerDashboard";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -80,6 +81,7 @@ export default function App() {
               }
             >
               <Route index path="/" element={<Ecommerce />} />
+              <Route path="/partner-dashboard" element={<PartnerDashboard />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/marketing" element={<Marketing />} />
               <Route path="/crm" element={<Crm />} />
