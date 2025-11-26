@@ -1,8 +1,29 @@
+import { useState, FormEvent } from "react";
 import { Link } from "react-router";
+import { ChevronLeftIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
+import { useRequestPasswordReset } from "../../hooks/useAuth";
+import { ApiErrorResponse } from "../../types/api.types";
 
 export default function ResetPasswordForm() {
+  const [email, setEmail] = useState("");
+  const resetMutation = useRequestPasswordReset();
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    resetMutation.mutate({ email });
+  };
+
+  const getErrorMessage = () => {
+    if (resetMutation.error) {
+      const error = resetMutation.error as unknown as ApiErrorResponse;
+      return error.message || "An error occurred. Please try again.";
+    }
+    return "";
+  };
+
   return (
     <div className="flex flex-col flex-1 w-full lg:w-1/2">
       <div className="w-full max-w-md pt-10 mx-auto">
@@ -10,22 +31,7 @@ export default function ResetPasswordForm() {
           to="/"
           className="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         >
-          <svg
-            className="stroke-current"
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-          >
-            <path
-              d="M12.7083 5L7.5 10.2083L12.7083 15.4167"
-              stroke=""
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <ChevronLeftIcon className="size-5" />
           Back to dashboard
         </Link>
       </div>
@@ -40,7 +46,19 @@ export default function ResetPasswordForm() {
           </p>
         </div>
         <div>
-          <form>
+          <form onSubmit={handleSubmit}>
+            {resetMutation.isSuccess && (
+              <div className="p-4 mb-6 text-sm text-green-800 bg-green-50 rounded-lg dark:bg-green-900/20 dark:text-green-400">
+                Password reset link has been sent to your email. Please check your inbox.
+              </div>
+            )}
+            
+            {resetMutation.error && (
+              <div className="p-4 mb-6 text-sm text-red-800 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
+                {getErrorMessage()}
+              </div>
+            )}
+            
             <div className="space-y-5">
               {/* <!-- Email --> */}
               <div>
@@ -52,22 +70,29 @@ export default function ResetPasswordForm() {
                   id="email"
                   name="email"
                   placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={resetMutation.isPending || resetMutation.isSuccess}
                 />
               </div>
 
               {/* <!-- Button --> */}
               <div>
-                <button className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600">
-                  Send Reset Link
+                <button 
+                  type="submit"
+                  className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={resetMutation.isPending || resetMutation.isSuccess}
+                >
+                  {resetMutation.isPending ? "Sending..." : "Send Reset Link"}
                 </button>
               </div>
             </div>
           </form>
           <div className="mt-5">
             <p className="text-sm font-normal text-center text-gray-700 dark:text-gray-400 sm:text-start">
-              Wait, I remember my password...
+              Wait, I remember my password...{" "}
               <Link
-                to="/"
+                to="/signin"
                 className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
               >
                 Click here
