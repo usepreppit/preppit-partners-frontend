@@ -3,9 +3,36 @@ import { Outlet } from "react-router";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
+import { useAuthContext } from "../context/AuthContext";
+import { useEffect, useState } from "react";
+import PartnerOnboardingModal from "../components/common/PartnerOnboardingModal";
+import { useCompleteOnboarding } from "../hooks/useOnboarding";
+import { PartnerProfile } from "../types/auth.types";
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
+  const { user } = useAuthContext();
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const completeOnboardingMutation = useCompleteOnboarding();
+
+  // Check if partner needs to complete onboarding
+  useEffect(() => {
+    if (user && user.role === 'partner' && !user.hasCompletedOnboarding) {
+      setShowOnboardingModal(true);
+    }
+  }, [user]);
+
+  const handleOnboardingComplete = async (profileData: PartnerProfile) => {
+    completeOnboardingMutation.mutate(profileData, {
+      onSuccess: () => {
+        setShowOnboardingModal(false);
+      },
+      onError: (error) => {
+        console.error('Onboarding failed:', error);
+        alert('Failed to complete onboarding. Please try again.');
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen xl:flex">
@@ -23,6 +50,14 @@ const LayoutContent: React.FC = () => {
           <Outlet />
         </div>
       </div>
+
+      {/* Partner Onboarding Modal */}
+      {user?.role === 'partner' && (
+        <PartnerOnboardingModal
+          isOpen={showOnboardingModal}
+          onComplete={handleOnboardingComplete}
+        />
+      )}
     </div>
   );
 };

@@ -1,3 +1,14 @@
+export interface PartnerProfile {
+  organizationName?: string;
+  contactPersonFullName?: string;
+  phoneNumber?: string;
+  country?: string;
+  timezone?: string;
+  organizationLogo?: string;
+  preferredCurrency?: string;
+  selectedExams?: string[];
+}
+
 export interface User {
   id: string;
   email: string;
@@ -5,6 +16,8 @@ export interface User {
   lastname: string;
   role: string;
   avatar?: string;
+  hasCompletedOnboarding?: boolean;
+  partnerProfile?: PartnerProfile;
   createdAt: string;
   updatedAt: string;
 }
