@@ -54,6 +54,7 @@ import Tooltips from "./pages/UiElements/Tooltips";
 import Modals from "./pages/UiElements/Modals";
 import ResetPassword from "./pages/AuthPages/ResetPassword";
 import TwoStepVerification from "./pages/AuthPages/TwoStepVerification";
+import SignUpSuccess from "./pages/AuthPages/SignUpSuccess";
 import Success from "./pages/OtherPage/Success";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
@@ -151,6 +152,9 @@ export default function App() {
             path="/two-step-verification"
             element={<GuestRoute><TwoStepVerification /></GuestRoute>}
           />
+
+          {/* Public Routes (accessible to all users) */}
+          <Route path="/signup-success" element={<SignUpSuccess />} />
 
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />

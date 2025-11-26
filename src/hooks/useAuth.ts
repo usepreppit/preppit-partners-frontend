@@ -49,8 +49,8 @@ export const useRegister = () => {
       // Store user data in cache
       queryClient.setQueryData(authKeys.currentUser, data.data.user);
       
-      // Navigate to dashboard
-      navigate('/');
+      // Navigate to signup success page
+      navigate('/signup-success');
     },
   });
 };
