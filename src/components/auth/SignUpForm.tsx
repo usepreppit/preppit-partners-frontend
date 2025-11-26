@@ -44,7 +44,7 @@ export default function SignUpForm() {
   const getErrorMessage = () => {
     if (registerMutation.error) {
       const error = registerMutation.error as unknown as ApiErrorResponse;
-      return error.message || "An error occurred during registration";
+      return error.details?.message || error.message || "An error occurred during registration";
     }
     return "";
   };

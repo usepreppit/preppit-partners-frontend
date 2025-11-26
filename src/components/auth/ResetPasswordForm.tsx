@@ -19,7 +19,7 @@ export default function ResetPasswordForm() {
   const getErrorMessage = () => {
     if (resetMutation.error) {
       const error = resetMutation.error as unknown as ApiErrorResponse;
-      return error.message || "An error occurred. Please try again.";
+      return error.details?.message || error.message || "An error occurred. Please try again.";
     }
     return "";
   };

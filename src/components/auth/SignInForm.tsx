@@ -29,7 +29,7 @@ export default function SignInForm() {
   const getErrorMessage = () => {
     if (loginMutation.error) {
       const error = loginMutation.error as unknown as ApiErrorResponse;
-      return error.message || "An error occurred during login";
+      return error.details?.message || error.message || "An error occurred during login";
     }
     return "";
   };
