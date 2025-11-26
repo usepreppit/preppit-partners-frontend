@@ -4,14 +4,21 @@ import { ApiResponse } from '../types/api.types';
 
 export const onboardingService = {
   /**
-   * Complete partner onboarding
+   * Update partner profile (onboarding step)
    */
-  completeOnboarding: async (profileData: PartnerProfile): Promise<ApiResponse<User>> => {
-    return apiService.post<ApiResponse<User>>('/partners/complete-onboarding', profileData);
+  updateOnboardingProfile: async (profileData: PartnerProfile): Promise<ApiResponse<User>> => {
+    return apiService.put<ApiResponse<User>>('/profile/onboarding', profileData);
   },
 
   /**
-   * Update partner profile
+   * Complete partner onboarding
+   */
+  completeOnboarding: async (profileData: PartnerProfile): Promise<ApiResponse<User>> => {
+    return apiService.post<ApiResponse<User>>('/profile/complete_onboarding', profileData);
+  },
+
+  /**
+   * Update partner profile (after onboarding)
    */
   updatePartnerProfile: async (profileData: Partial<PartnerProfile>): Promise<ApiResponse<User>> => {
     return apiService.patch<ApiResponse<User>>('/partners/profile', profileData);
