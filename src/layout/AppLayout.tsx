@@ -17,7 +17,7 @@ const LayoutContent: React.FC = () => {
 
   // Check if partner needs to complete onboarding
   useEffect(() => {
-    if (user && user.role === 'partner' && !user.hasCompletedOnboarding) {
+    if (user && user.account_type === 'partner' && user.onboarding_status && !user.onboarding_status.is_completed) {
       setShowOnboardingModal(true);
     }
   }, [user]);
@@ -52,7 +52,7 @@ const LayoutContent: React.FC = () => {
       </div>
 
       {/* Partner Onboarding Modal */}
-      {user?.role === 'partner' && (
+      {user?.account_type === 'partner' && (
         <PartnerOnboardingModal
           isOpen={showOnboardingModal}
           onComplete={handleOnboardingComplete}

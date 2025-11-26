@@ -1,25 +1,37 @@
+export interface OnboardingStatus {
+  is_completed: boolean;
+  completion_percentage: number;
+  missing_fields: string[];
+}
+
 export interface PartnerProfile {
-  organizationName?: string;
-  contactPersonFullName?: string;
-  phoneNumber?: string;
+  organization_name?: string;
+  contact_person_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
   country?: string;
   timezone?: string;
-  organizationLogo?: string;
-  preferredCurrency?: string;
-  selectedExams?: string[];
+  organization_logo?: string;
+  preferred_currency?: string;
+  exam_types?: string[];
 }
 
 export interface User {
-  id: string;
+  _id: string;
+  id?: string; // Keep for backwards compatibility
   email: string;
   firstname: string;
   lastname: string;
-  role: string;
+  account_type: string; // 'partner', 'admin', etc.
+  role?: string; // Keep for backwards compatibility
   avatar?: string;
-  hasCompletedOnboarding?: boolean;
+  is_active: boolean;
+  partner_status?: string;
+  onboarding_status?: OnboardingStatus;
   partnerProfile?: PartnerProfile;
   createdAt: string;
   updatedAt: string;
+  __v?: number;
 }
 
 export interface LoginRequest {

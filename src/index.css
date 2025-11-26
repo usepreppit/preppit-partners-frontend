@@ -782,3 +782,49 @@ span.flatpickr-weekday,
 .simplebar-scrollbar.simplebar-visible:before {
   @apply opacity-100;
 }
+
+/* React Phone Input Custom Styles */
+.phone-input-custom .PhoneInputInput {
+  @apply w-full px-4 py-3 text-sm transition-colors bg-white border border-gray-300 rounded-lg outline-none text-gray-700 placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400;
+}
+
+.phone-input-custom .PhoneInputCountrySelect {
+  @apply mr-2 px-2 py-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+}
+
+.phone-input-custom .PhoneInputCountryIcon {
+  @apply mr-2;
+}
+
+/* React Select Custom Styles for Dark Mode */
+.dark .react-select__control {
+  @apply bg-gray-800 border-gray-700 !important;
+}
+
+.dark .react-select__menu {
+  @apply bg-gray-800 border-gray-700 !important;
+}
+
+.dark .react-select__option {
+  @apply text-white !important;
+}
+
+.dark .react-select__option--is-focused {
+  @apply bg-gray-700 !important;
+}
+
+.dark .react-select__option--is-selected {
+  @apply bg-brand-500 !important;
+}
+
+.dark .react-select__single-value {
+  @apply text-white !important;
+}
+
+.dark .react-select__input {
+  @apply text-white !important;
+}
+
+.dark .react-select__placeholder {
+  @apply text-gray-500 !important;
+}

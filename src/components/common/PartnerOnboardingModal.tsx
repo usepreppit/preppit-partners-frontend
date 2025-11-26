@@ -3,6 +3,11 @@ import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import { PartnerProfile } from "../../types/auth.types";
+import { useAuthContext } from "../../context/AuthContext";
+import PhoneInput from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
+import Select from 'react-select';
+import { countries } from 'countries-list';
 
 interface PartnerOnboardingModalProps {
   isOpen: boolean;
@@ -36,18 +41,26 @@ const TIMEZONES = [
   { value: "Asia/Dubai", label: "Dubai (GST)" },
 ];
 
+// Prepare country options for react-select
+const COUNTRY_OPTIONS = Object.entries(countries).map(([code, country]) => ({
+  value: country.name,
+  label: country.name,
+  code: code,
+})).sort((a, b) => a.label.localeCompare(b.label));
+
 export default function PartnerOnboardingModal({
   isOpen,
   onComplete,
 }: PartnerOnboardingModalProps) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuthContext();
 
   // Form state
   const [organizationName, setOrganizationName] = useState("");
-  const [contactPersonFullName, setContactPersonFullName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [country, setCountry] = useState("");
+  const [contactPersonName, setContactPersonName] = useState("");
+  const [contactPhone, setContactPhone] = useState<string | undefined>("");
+  const [country, setCountry] = useState<{ value: string; label: string } | null>(null);
   const [timezone, setTimezone] = useState("");
   const [preferredCurrency, setPreferredCurrency] = useState("USD");
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
@@ -64,7 +77,7 @@ export default function PartnerOnboardingModal({
     e.preventDefault();
     if (step === 1) {
       // Validate step 1
-      if (!organizationName || !contactPersonFullName || !phoneNumber || !country || !timezone) {
+      if (!organizationName || !contactPersonName || !contactPhone || !country || !timezone) {
         alert("Please fill in all required fields");
         return;
       }
@@ -83,13 +96,14 @@ export default function PartnerOnboardingModal({
     setIsSubmitting(true);
 
     const profileData: PartnerProfile = {
-      organizationName,
-      contactPersonFullName,
-      phoneNumber,
-      country,
+      organization_name: organizationName,
+      contact_person_name: contactPersonName,
+      contact_email: user?.email,
+      contact_phone: contactPhone,
+      country: country?.value,
       timezone,
-      preferredCurrency,
-      selectedExams,
+      preferred_currency: preferredCurrency,
+      exam_types: selectedExams,
     };
 
     onComplete(profileData);
@@ -151,8 +165,8 @@ export default function PartnerOnboardingModal({
                 <Input
                   type="text"
                   placeholder="Enter full name"
-                  value={contactPersonFullName}
-                  onChange={(e) => setContactPersonFullName(e.target.value)}
+                  value={contactPersonName}
+                  onChange={(e) => setContactPersonName(e.target.value)}
                 />
               </div>
 
@@ -161,11 +175,13 @@ export default function PartnerOnboardingModal({
                 <Label>
                   Phone Number<span className="text-error-500">*</span>
                 </Label>
-                <Input
-                  type="tel"
+                <PhoneInput
+                  international
+                  defaultCountry="US"
+                  value={contactPhone}
+                  onChange={setContactPhone}
+                  className="phone-input-custom"
                   placeholder="Enter phone number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
                 />
               </div>
 
@@ -175,11 +191,29 @@ export default function PartnerOnboardingModal({
                   <Label>
                     Country<span className="text-error-500">*</span>
                   </Label>
-                  <Input
-                    type="text"
-                    placeholder="Enter country"
+                  <Select
+                    options={COUNTRY_OPTIONS}
                     value={country}
-                    onChange={(e) => setCountry(e.target.value)}
+                    onChange={(selectedOption) => setCountry(selectedOption)}
+                    placeholder="Search and select country"
+                    isClearable
+                    classNamePrefix="react-select"
+                    className="react-select-container"
+                    styles={{
+                      control: (base, state) => ({
+                        ...base,
+                        minHeight: '48px',
+                        borderColor: state.isFocused ? '#7c3aed' : '#d1d5db',
+                        boxShadow: state.isFocused ? '0 0 0 1px #7c3aed' : 'none',
+                        '&:hover': {
+                          borderColor: state.isFocused ? '#7c3aed' : '#d1d5db',
+                        },
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        zIndex: 9999,
+                      }),
+                    }}
                   />
                 </div>
                 <div>
