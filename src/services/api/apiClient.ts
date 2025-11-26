@@ -53,6 +53,7 @@ apiClient.interceptors.response.use(
       message: error.response?.data?.message || error.message || 'An error occurred',
       statusCode: error.response?.status || 500,
       errors: error.response?.data?.errors,
+      details: error.response?.data?.details,
     };
 
     return Promise.reject(apiError);
