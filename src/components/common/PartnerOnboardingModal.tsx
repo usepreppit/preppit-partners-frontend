@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useEffect } from "react";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -8,6 +8,29 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import Select from 'react-select';
 import { countries } from 'countries-list';
+
+// Country code to timezone mapping
+const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
+  US: "America/New_York",
+  CA: "America/Toronto",
+  GB: "Europe/London",
+  NG: "Africa/Lagos",
+  AE: "Asia/Dubai",
+  AU: "Australia/Sydney",
+  IN: "Asia/Kolkata",
+  DE: "Europe/Berlin",
+  FR: "Europe/Paris",
+  ES: "Europe/Madrid",
+  IT: "Europe/Rome",
+  BR: "America/Sao_Paulo",
+  MX: "America/Mexico_City",
+  JP: "Asia/Tokyo",
+  CN: "Asia/Shanghai",
+  KR: "Asia/Seoul",
+  SG: "Asia/Singapore",
+  ZA: "Africa/Johannesburg",
+  NZ: "Pacific/Auckland",
+};
 
 interface PartnerOnboardingModalProps {
   isOpen: boolean;
@@ -60,10 +83,22 @@ export default function PartnerOnboardingModal({
   const [organizationName, setOrganizationName] = useState("");
   const [contactPersonName, setContactPersonName] = useState("");
   const [contactPhone, setContactPhone] = useState<string | undefined>("");
+  const [phoneCountry, setPhoneCountry] = useState<string | undefined>();
   const [country, setCountry] = useState<{ value: string; label: string } | null>(null);
   const [timezone, setTimezone] = useState("");
   const [preferredCurrency, setPreferredCurrency] = useState("USD");
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
+
+  // Auto-update timezone when phone country changes
+  useEffect(() => {
+    if (phoneCountry && COUNTRY_TIMEZONE_MAP[phoneCountry]) {
+      setTimezone(COUNTRY_TIMEZONE_MAP[phoneCountry]);
+    }
+  }, [phoneCountry]);
+
+  const handlePhoneChange = (value: string | undefined) => {
+    setContactPhone(value);
+  };
 
   const handleExamToggle = (examId: string) => {
     setSelectedExams((prev) =>
@@ -179,7 +214,8 @@ export default function PartnerOnboardingModal({
                   international
                   defaultCountry="US"
                   value={contactPhone}
-                  onChange={setContactPhone}
+                  onChange={handlePhoneChange}
+                  onCountryChange={setPhoneCountry}
                   className="phone-input-custom"
                   placeholder="Enter phone number"
                 />

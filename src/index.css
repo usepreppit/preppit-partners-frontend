@@ -784,47 +784,131 @@ span.flatpickr-weekday,
 }
 
 /* React Phone Input Custom Styles */
+.phone-input-custom {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
 .phone-input-custom .PhoneInputInput {
-  @apply w-full px-4 py-3 text-sm transition-colors bg-white border border-gray-300 rounded-lg outline-none text-gray-700 placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white dark:placeholder:text-gray-500 dark:focus:border-brand-400;
+  flex: 1;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+  outline: none;
+  color: #374151;
+  transition: border-color 0.2s;
+}
+
+.phone-input-custom .PhoneInputInput::placeholder {
+  color: #9ca3af;
+}
+
+.phone-input-custom .PhoneInputInput:focus {
+  border-color: #7c3aed;
+}
+
+.phone-input-custom .PhoneInputCountry {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-right: none;
+  border-top-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+  background-color: white;
+  display: flex;
+  align-items: center;
 }
 
 .phone-input-custom .PhoneInputCountrySelect {
-  @apply mr-2 px-2 py-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white;
+  outline: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 
 .phone-input-custom .PhoneInputCountryIcon {
-  @apply mr-2;
+  margin-right: 0.25rem;
+}
+
+.phone-input-custom:focus-within .PhoneInputCountry {
+  border-color: #7c3aed;
+}
+
+.phone-input-custom:focus-within .PhoneInputInput {
+  border-color: #7c3aed;
+}
+
+/* Dark mode styles for phone input */
+.dark .phone-input-custom .PhoneInputInput {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: white;
+}
+
+.dark .phone-input-custom .PhoneInputInput::placeholder {
+  color: #6b7280;
+}
+
+.dark .phone-input-custom .PhoneInputInput:focus {
+  border-color: #7c3aed;
+}
+
+.dark .phone-input-custom .PhoneInputCountry {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.dark .phone-input-custom .PhoneInputCountrySelect {
+  color: white;
+}
+
+.dark .phone-input-custom:focus-within .PhoneInputCountry {
+  border-color: #7c3aed;
+}
+
+.dark .phone-input-custom:focus-within .PhoneInputInput {
+  border-color: #7c3aed;
 }
 
 /* React Select Custom Styles for Dark Mode */
 .dark .react-select__control {
-  @apply bg-gray-800 border-gray-700 !important;
+  background-color: #1f2937;
+  border-color: #374151;
 }
 
 .dark .react-select__menu {
-  @apply bg-gray-800 border-gray-700 !important;
+  background-color: #1f2937;
+  border-color: #374151;
 }
 
 .dark .react-select__option {
-  @apply text-white !important;
+  color: white;
 }
 
 .dark .react-select__option--is-focused {
-  @apply bg-gray-700 !important;
+  background-color: #374151;
 }
 
 .dark .react-select__option--is-selected {
-  @apply bg-brand-500 !important;
+  background-color: #7c3aed;
 }
 
 .dark .react-select__single-value {
-  @apply text-white !important;
+  color: white;
 }
 
 .dark .react-select__input {
-  @apply text-white !important;
+  color: white;
 }
 
 .dark .react-select__placeholder {
-  @apply text-gray-500 !important;
+  color: #6b7280;
 }
