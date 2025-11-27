@@ -10,6 +10,7 @@ import Exams from "./pages/Partner/Exams";
 import Finances from "./pages/Partner/Finances";
 import Subscriptions from "./pages/Partner/Subscriptions";
 import Support from "./pages/Partner/Support";
+import Billing from "./pages/Partner/Billing";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import NotFound from "./pages/OtherPage/NotFound";
@@ -90,6 +91,7 @@ export default function App() {
               <Route path="/candidates" element={<Candidates />} />
               <Route path="/exams" element={<Exams />} />
               <Route path="/finances" element={<Finances />} />
+              <Route path="/billing" element={<Billing />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/support" element={<Support />} />
               <Route path="/analytics" element={<Analytics />} />

@@ -59,6 +59,11 @@ const partnerNavItems: NavItem[] = [
   },
   {
     icon: <BoxIcon />,
+    name: "Billing",
+    path: "/billing",
+  },
+  {
+    icon: <BoxIcon />,
     name: "Subscriptions",
     path: "/subscriptions",
   },
@@ -79,6 +84,11 @@ const partnerSupportItems: NavItem[] = [
     icon: <ChatIcon />,
     name: "Chat",
     path: "/chat",
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "Profile",
+    path: "/profile",
   },
 ];
 
@@ -220,6 +230,11 @@ const supportItems: NavItem[] = [
     icon: <DocsIcon />,
     name: "Invoice",
     path: "/invoice",
+  },
+  {
+    icon: <UserCircleIcon />,
+    name: "Profile",
+    path: "/profile",
   },
 ];
 

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import NextStepsCard from '../../components/common/NextStepsCard';
 import KeyMetricsCard from '../../components/partner-dashboard/KeyMetricsCard';
 import FinanceCard from '../../components/partner-dashboard/FinanceCard';
@@ -5,51 +6,141 @@ import PracticeOverviewCard from '../../components/partner-dashboard/PracticeOve
 import RevenueSpendChart from '../../components/partner-dashboard/RevenueSpendChart';
 import CandidatesGrowthChart from '../../components/partner-dashboard/CandidatesGrowthChart';
 import { useAuth } from '../../hooks/useAuth';
+import { partnerDashboardService, getDefaultDashboardData } from '../../services/dashboard.service';
+import { candidatesService } from '../../services/candidates.service';
 
 export default function PartnerDashboard() {
   const { user } = useAuth();
 
-  // TODO: Replace with actual API data
-  const mockData = {
-    keyMetrics: {
-      totalCandidates: 156,
-      completedSessions: 423,
-      averageScore: 87.5,
-      candidatesChange: 12,
-      sessionsChange: 8,
-      scoreChange: 3.2,
+  // Fetch dashboard data from API
+  const {
+    data: dashboardData,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['partnerDashboard'],
+    queryFn: partnerDashboardService.getDashboard,
+    staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
+    retry: 2,
+  });
+
+  // Fetch candidates data for accurate statistics
+  const {
+    data: candidatesData,
+    isLoading: candidatesLoading,
+  } = useQuery({
+    queryKey: ['candidatesStats'],
+    queryFn: () => candidatesService.getCandidates(1, 1000), // Fetch large batch for stats
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Calculate candidate statistics from real data
+  const candidates = candidatesData?.data?.candidates || [];
+  const totalCandidates = candidatesData?.data?.total_candidates || 0;
+  
+  // Calculate growth over last month
+  const today = new Date();
+  const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+  const twoMonthsDate = new Date(today.getFullYear(), today.getMonth() - 2, today.getDate());
+  
+  const candidatesThisMonth = candidates.filter(
+    (c) => new Date(c.createdAt) >= lastMonthDate
+  ).length;
+  
+  const candidatesLastMonth = candidates.filter(
+    (c) => {
+      const date = new Date(c.createdAt);
+      return date >= twoMonthsDate && date < lastMonthDate;
+    }
+  ).length;
+  
+  // Calculate percentage change
+  const candidatesChange = candidatesLastMonth > 0 
+    ? Math.round(((candidatesThisMonth - candidatesLastMonth) / candidatesLastMonth) * 100)
+    : candidatesThisMonth > 0 ? 100 : 0;
+
+  // Calculate candidates by month for the chart
+  const candidatesByMonth = Array(12).fill(0).map((_, index) => {
+    const monthStart = new Date(today.getFullYear(), index, 1);
+    const monthEnd = new Date(today.getFullYear(), index + 1, 0);
+    const monthName = monthStart.toLocaleDateString('en-US', { month: 'short' });
+    
+    const count = candidates.filter(c => {
+      const date = new Date(c.createdAt);
+      return date >= monthStart && date <= monthEnd;
+    }).length;
+    
+    return { month: monthName, value: count };
+  });
+
+  // Use API data or fallback to default structure
+  const data = dashboardData || getDefaultDashboardData();
+
+  // Merge real candidate data with dashboard data
+  const enhancedData = {
+    ...data,
+    metrics: {
+      ...data.metrics,
+      totalCandidates: totalCandidates,
+      candidatesChange: candidatesChange,
     },
-    finance: {
-      totalRevenue: 45680,
-      pendingPayments: 8950,
-      averageSessionCost: 108,
-      currency: user?.partnerProfile?.preferred_currency || 'USD',
-      revenueChange: 15,
-    },
-    practice: {
-      totalPracticeSessions: 789,
-      averageDuration: 45,
-      feedbackResponses: 612,
-      sessionsChange: 6,
-      responseRate: 77.6,
-    },
-    nextSteps: [
-      {
-        id: 'add-candidates',
-        title: 'Add Candidates',
-        description: 'Start by adding your first candidate to the system',
-        completed: false,
-        link: '/candidates/new',
+    charts: {
+      ...data.charts,
+      candidatesGrowth: {
+        candidates: candidatesByMonth,
       },
-      {
-        id: 'setup-payment',
-        title: 'Set Up Payment Method',
-        description: 'Configure your payment details to receive payouts',
-        completed: false,
-        link: '/settings/payment',
-      },
-    ],
+    },
   };
+
+  // Loading State
+  if (isLoading || candidatesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error State
+  if (isError) {
+    return (
+      <div className="card">
+        <div className="card-body text-center py-12">
+          <div className="text-red-500 mb-4">
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Failed to Load Dashboard
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {error instanceof Error ? error.message : 'An error occurred while loading your dashboard data.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn btn-primary"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -66,16 +157,16 @@ export default function PartnerDashboard() {
       </div>
 
       {/* Next Steps Card (only shown if incomplete) */}
-      <NextStepsCard steps={mockData.nextSteps} />
+      <NextStepsCard steps={enhancedData.nextSteps} />
 
       {/* Key Metrics */}
-      <KeyMetricsCard {...mockData.keyMetrics} />
+      <KeyMetricsCard {...enhancedData.metrics} />
 
       {/* Financial Overview */}
-      <FinanceCard {...mockData.finance} />
+      <FinanceCard {...enhancedData.financial} />
 
       {/* Practice Sessions Overview */}
-      <PracticeOverviewCard {...mockData.practice} />
+      <PracticeOverviewCard {...enhancedData.practiceSession} />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -88,7 +179,10 @@ export default function PartnerDashboard() {
             </p>
           </div>
           <div className="card-body">
-            <RevenueSpendChart currency={mockData.finance.currency} />
+            <RevenueSpendChart 
+              currency={enhancedData.financial.currency} 
+              chartData={enhancedData.charts.revenueSpend}
+            />
           </div>
         </div>
 
@@ -101,7 +195,7 @@ export default function PartnerDashboard() {
             </p>
           </div>
           <div className="card-body">
-            <CandidatesGrowthChart />
+            <CandidatesGrowthChart chartData={enhancedData.charts.candidatesGrowth} />
           </div>
         </div>
       </div>

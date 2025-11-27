@@ -1,14 +1,17 @@
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
+import { RevenueSpendChartData, transformChartData, getChartLabels } from "../../services/dashboard.service";
 
 interface RevenueSpendChartProps {
   currency?: string;
+  chartData?: RevenueSpendChartData;
 }
 
-export default function RevenueSpendChart({ currency = 'USD' }: RevenueSpendChartProps) {
-  // Mock data - TODO: Replace with actual API data
-  const revenueData = [12500, 15200, 18400, 16800, 21500, 24300, 28700, 31200, 29800, 35400, 38900, 42100];
-  const spendData = [8200, 9100, 10500, 9800, 11200, 12800, 14500, 15800, 14200, 16700, 18200, 19500];
+export default function RevenueSpendChart({ currency = 'USD', chartData }: RevenueSpendChartProps) {
+  // Use provided data or fallback to mock data for development
+  const revenueData = chartData ? transformChartData(chartData.revenue) : [12500, 15200, 18400, 16800, 21500, 24300, 28700, 31200, 29800, 35400, 38900, 42100];
+  const spendData = chartData ? transformChartData(chartData.spend) : [8200, 9100, 10500, 9800, 11200, 12800, 14500, 15800, 14200, 16700, 18200, 19500];
+  const categories = chartData ? getChartLabels(chartData.revenue) : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const options: ApexOptions = {
     legend: {
@@ -88,20 +91,7 @@ export default function RevenueSpendChart({ currency = 'USD' }: RevenueSpendChar
     },
     xaxis: {
       type: "category",
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
+      categories: categories,
       axisBorder: {
         show: false,
       },

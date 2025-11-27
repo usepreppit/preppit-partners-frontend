@@ -1,9 +1,15 @@
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
+import { CandidatesGrowthData, transformChartData, getChartLabels } from "../../services/dashboard.service";
 
-export default function CandidatesGrowthChart() {
-  // Mock data - TODO: Replace with actual API data
-  const candidatesData = [12, 18, 25, 32, 45, 58, 72, 89, 105, 128, 142, 156];
+interface CandidatesGrowthChartProps {
+  chartData?: CandidatesGrowthData;
+}
+
+export default function CandidatesGrowthChart({ chartData }: CandidatesGrowthChartProps) {
+  // Use provided data or fallback to mock data for development
+  const candidatesData = chartData ? transformChartData(chartData.candidates) : [12, 18, 25, 32, 45, 58, 72, 89, 105, 128, 142, 156];
+  const categories = chartData ? getChartLabels(chartData.candidates) : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const options: ApexOptions = {
     legend: {
@@ -71,20 +77,7 @@ export default function CandidatesGrowthChart() {
       },
     },
     xaxis: {
-      categories: [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-      ],
+      categories: categories,
       axisBorder: {
         show: false,
       },
