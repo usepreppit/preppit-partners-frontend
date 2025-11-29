@@ -7,15 +7,9 @@ import { paymentService, PaymentMethod } from '../../services/payment.service';
 interface PaymentPromptModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mode: 'create' | 'extend';
-  
-  // For 'create' mode (new seat purchase)
-  batchName?: string;
-  
-  // For 'extend' mode (add capacity to existing batch)
-  batchId?: string;
-  candidateCount?: number;
-  
+  batchId: string;
+  batchName: string;
+  minSeats?: number; // Minimum seats to purchase (default 10 for new, 1 for extend)
   onPaymentComplete: () => void;
   onSkip?: () => void;
 }
@@ -23,18 +17,16 @@ interface PaymentPromptModalProps {
 export default function PaymentPromptModal({
   isOpen,
   onClose,
-  mode,
-  batchName,
   batchId,
-  candidateCount = 1,
+  batchName,
+  minSeats = 10,
   onPaymentComplete,
   onSkip,
 }: PaymentPromptModalProps) {
   const [selectedMonths, setSelectedMonths] = useState(1);
-  const [selectedSessions, setSelectedSessions] = useState<number>(3);
-  const [selectedSeats, setSelectedSeats] = useState(mode === 'create' ? 10 : candidateCount);
+  const [selectedSeats, setSelectedSeats] = useState(minSeats);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  const [newBatchName, setNewBatchName] = useState(batchName || '');
+  const [autoRenew, setAutoRenew] = useState(false);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -49,12 +41,12 @@ export default function PaymentPromptModal({
     };
   }, [isOpen]);
 
-  // Update seats when candidateCount changes (for extend mode)
+  // Update seats when minSeats changes
   useEffect(() => {
-    if (mode === 'extend' && candidateCount) {
-      setSelectedSeats(candidateCount);
+    if (minSeats) {
+      setSelectedSeats(Math.max(minSeats, selectedSeats));
     }
-  }, [mode, candidateCount]);
+  }, [minSeats]);
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
@@ -63,31 +55,18 @@ export default function PaymentPromptModal({
     enabled: isOpen,
   });
 
-  // Fetch pricing based on seats, sessions, and months
+  // Fetch pricing based on seats and months (sessions_per_day removed from pricing)
   const { data: pricingData, isLoading: isPricingLoading } = useQuery({
-    queryKey: ['pricing', selectedSeats, selectedSessions, selectedMonths],
-    queryFn: () => paymentService.getPricing(selectedSeats, selectedSessions, selectedMonths),
-    enabled: isOpen && selectedSeats > 0,
+    queryKey: ['pricing', selectedSeats, selectedMonths],
+    queryFn: () => paymentService.getPricing(selectedSeats, 3, selectedMonths), // Pass default sessions_per_day for now
+    enabled: isOpen && selectedSeats >= minSeats,
   });
 
-  // Create seat mutation (for 'create' mode)
-  const createSeatMutation = useMutation({
-    mutationFn: paymentService.createSeat,
+  // Purchase seats mutation
+  const purchaseSeatsMutation = useMutation({
+    mutationFn: paymentService.purchaseSeats,
     onSuccess: () => {
-      alert('Subscription created successfully!');
-      onPaymentComplete();
-      onClose();
-    },
-    onError: () => {
-      alert('Payment failed. Please try again.');
-    },
-  });
-
-  // Extend seat mutation (for 'extend' mode)
-  const extendSeatMutation = useMutation({
-    mutationFn: paymentService.extendSeat,
-    onSuccess: () => {
-      alert('Capacity extended successfully!');
+      alert('Seats purchased successfully!');
       onPaymentComplete();
       onClose();
     },
@@ -116,38 +95,24 @@ export default function PaymentPromptModal({
       return;
     }
 
-    if (mode === 'create') {
-      if (!newBatchName.trim()) {
-        alert('Please enter a batch name');
-        return;
-      }
-      
-      createSeatMutation.mutate({
-        batch_name: newBatchName,
-        total_seats: selectedSeats,
-        sessions_per_day: selectedSessions,
-        duration_months: selectedMonths,
-        payment_method_id: selectedPaymentMethod,
-      });
-    } else {
-      // mode === 'extend'
-      if (!batchId) {
-        alert('Batch ID is required');
-        return;
-      }
-      
-      extendSeatMutation.mutate({
-        batch_id: batchId,
-        additional_seats: selectedSeats,
-        payment_method_id: selectedPaymentMethod,
-      });
+    if (!batchId) {
+      alert('Batch ID is required');
+      return;
     }
+    
+    purchaseSeatsMutation.mutate({
+      seat_count: selectedSeats,
+      months: selectedMonths,
+      batch_id: batchId,
+      payment_method_id: selectedPaymentMethod,
+      auto_renew: autoRenew,
+    });
   };
 
   if (!isOpen) return null;
 
   const paymentMethods = paymentMethodsData?.data?.payment_methods || [];
-  const isProcessing = createSeatMutation.isPending || extendSeatMutation.isPending;
+  const isProcessing = purchaseSeatsMutation.isPending;
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center">
@@ -167,12 +132,10 @@ export default function PaymentPromptModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {mode === 'create' ? 'Create New Subscription' : 'Extend Batch Capacity'}
+                Purchase Seats for {batchName}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {mode === 'create' 
-                  ? 'Purchase seats for a new batch (minimum 10 seats)' 
-                  : `Add ${candidateCount} seat${candidateCount > 1 ? 's' : ''} to continue adding candidates`}
+                Add {selectedSeats} seat{selectedSeats > 1 ? 's' : ''} to this batch
               </p>
             </div>
           </div>
@@ -188,67 +151,21 @@ export default function PaymentPromptModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Batch Name (only for create mode) */}
-          {mode === 'create' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Batch Name
-              </label>
-              <input
-                type="text"
-                value={newBatchName}
-                onChange={(e) => setNewBatchName(e.target.value)}
-                placeholder="Enter batch name"
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-          )}
-
-          {/* Number of Seats (only for create mode) */}
-          {mode === 'create' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Number of Seats (Minimum 10)
-              </label>
-              <input
-                type="number"
-                min="10"
-                value={selectedSeats}
-                onChange={(e) => setSelectedSeats(Math.max(10, parseInt(e.target.value) || 10))}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Each seat allows one candidate to practice
-              </p>
-            </div>
-          )}
-
-          {/* Sessions Per Day */}
+          {/* Number of Seats */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Sessions Per Day
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Number of Seats {minSeats > 1 && `(Minimum ${minSeats})`}
             </label>
-            <div className="grid grid-cols-4 gap-3">
-              {[3, 5, 10, 'unlimited'].map((sessions) => (
-                <button
-                  key={sessions}
-                  type="button"
-                  onClick={() => setSelectedSessions(sessions === 'unlimited' ? -1 : sessions as number)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-all text-center ${
-                    selectedSessions === (sessions === 'unlimited' ? -1 : sessions)
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="text-base font-semibold text-gray-900 dark:text-white">
-                    {sessions === 'unlimited' ? '∞' : sessions}
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {sessions === 'unlimited' ? 'Unlimited' : 'sessions'}
-                  </div>
-                </button>
-              ))}
-            </div>
+            <input
+              type="number"
+              min={minSeats}
+              value={selectedSeats}
+              onChange={(e) => setSelectedSeats(Math.max(minSeats, parseInt(e.target.value) || minSeats))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Each seat allows one candidate to practice
+            </p>
           </div>
 
           {/* Subscription Duration */}
@@ -277,12 +194,24 @@ export default function PaymentPromptModal({
             </div>
           </div>
 
+          {/* Auto-Renew */}
+          <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+            <input
+              type="checkbox"
+              id="auto-renew"
+              checked={autoRenew}
+              onChange={(e) => setAutoRenew(e.target.checked)}
+              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+            />
+            <label htmlFor="auto-renew" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+              Enable auto-renewal (automatically renew subscription before expiry)
+            </label>
+          </div>
+
           {/* Summary */}
           <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="text-sm text-gray-700 dark:text-gray-300">
               <span className="font-semibold">{selectedSeats} seat{selectedSeats > 1 ? 's' : ''}</span>
-              {' × '}
-              <span className="font-semibold">{selectedSessions === -1 ? 'unlimited' : selectedSessions} session{selectedSessions !== 1 && selectedSessions !== -1 ? 's' : ''}/day</span>
               {' × '}
               <span className="font-semibold">{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
             </div>
@@ -391,7 +320,7 @@ export default function PaymentPromptModal({
             variant="primary"
             size="md"
             className="flex-1"
-            disabled={!selectedPaymentMethod || isPricingLoading || isProcessing || (mode === 'create' && selectedSeats < 10)}
+            disabled={!selectedPaymentMethod || isPricingLoading || isProcessing || selectedSeats < minSeats}
           >
             {isProcessing ? 'Processing...' : `Pay $${pricingData?.data?.amount?.toFixed(2) || '0.00'}`}
           </Button>

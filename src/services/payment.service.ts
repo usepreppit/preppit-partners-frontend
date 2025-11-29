@@ -13,30 +13,22 @@ export interface Seat {
   id: string;
   batch_id: string;
   batch_name: string;
-  total_seats: number;
-  used_seats: number;
-  available_seats: number;
+  seat_count: number; // Total seats purchased
+  seats_assigned: number; // Seats currently in use
   sessions_per_day: number; // 3, 5, 10, or -1 for unlimited
   duration_months: number;
   start_date: string;
   end_date: string;
-  renewal_date: string;
+  auto_renew: boolean;
   is_active: boolean;
-  is_ended: boolean;
 }
 
-export interface CreateSeatRequest {
-  batch_name: string;
-  total_seats: number; // minimum 10 for new batch
-  sessions_per_day: number; // 3, 5, 10, or -1 for unlimited
-  duration_months: number; // 1, 3, 6, or 12
-  payment_method_id: string;
-}
-
-export interface ExtendSeatRequest {
+export interface PurchaseSeatsRequest {
+  seat_count: number; // minimum 10 for new batch
+  months: number; // 1, 3, 6, or 12
   batch_id: string;
-  additional_seats: number;
   payment_method_id: string;
+  auto_renew?: boolean;
 }
 
 export interface PricingRequest {
@@ -141,26 +133,18 @@ export const paymentService = {
   },
 
   /**
-   * Create new seat (minimum 10)
+   * Purchase seats for a batch (minimum 10)
    */
-  createSeat: async (data: CreateSeatRequest): Promise<ProcessPaymentResponse> => {
-    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats', data);
+  purchaseSeats: async (data: PurchaseSeatsRequest): Promise<ProcessPaymentResponse> => {
+    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats/purchase', data);
     return response.data;
   },
 
   /**
-   * Extend seat capacity
+   * Sunset/deactivate a batch
    */
-  extendSeat: async (data: ExtendSeatRequest): Promise<ProcessPaymentResponse> => {
-    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats/extend', data);
-    return response.data;
-  },
-
-  /**
-   * End/sunset a batch
-   */
-  endBatch: async (batchId: string): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.post(`/payments/seats/${batchId}/end`);
+  sunsetBatch: async (batchId: string): Promise<{ success: boolean; message: string; data: any }> => {
+    const response = await apiClient.post(`/candidates/batches/${batchId}/sunset`);
     return response.data;
   },
 

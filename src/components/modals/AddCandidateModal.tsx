@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Select from 'react-select';
-import { candidatesService, CreateCandidateData, CreateBatchData } from "../../services/candidates.service";
-import { CloseIcon, PlusIcon, DownloadIcon } from "../../icons";
+import { candidatesService, CreateCandidateData } from "../../services/candidates.service";
+import { paymentService } from "../../services/payment.service";
+import { CloseIcon, DownloadIcon } from "../../icons";
 import Button from "../ui/button/Button";
 import PaymentPromptModal from "./PaymentPromptModal";
 import { useEffect } from "react";
@@ -15,10 +16,15 @@ interface AddCandidateModalProps {
 
 type ModalMode = 'single' | 'batch';
 
+interface BatchWithSeats {
+  _id: string;
+  batch_name: string;
+  availableSeats: number;
+  totalSeats: number;
+}
+
 export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCandidateModalProps) {
   const [mode, setMode] = useState<ModalMode>('single');
-  const [showNewBatchForm, setShowNewBatchForm] = useState(false);
-  const [showNewBatchFormCsv, setShowNewBatchFormCsv] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [selectedBatchForCsv, setSelectedBatchForCsv] = useState<string>("");
   
@@ -34,18 +40,6 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     lastname: "",
     email: "",
     batch_id: "",
-  });
-
-  // New batch form
-  const [newBatchForm, setNewBatchForm] = useState<CreateBatchData>({
-    batch_name: "",
-    description: "",
-  });
-
-  // New batch form for CSV mode
-  const [newBatchFormCsv, setNewBatchFormCsv] = useState<CreateBatchData>({
-    batch_name: "",
-    description: "",
   });
 
   const queryClient = useQueryClient();
@@ -70,6 +64,30 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     enabled: isOpen,
   });
 
+  // Fetch seats to filter out ended batches
+  const { data: seatsData } = useQuery({
+    queryKey: ['seats'],
+    queryFn: paymentService.getSeats,
+    enabled: isOpen,
+  });
+
+  // Filter out inactive batches
+  const activeBatches = batches.filter(batch => {
+    const seat = seatsData?.data?.seats?.find(s => s.batch_id === batch._id);
+    return !seat || seat.is_active; // Show batch if no seat found or seat is active
+  });
+
+  // Filter out inactive batches and add seat information
+  const batchesWithSeats: BatchWithSeats[] = activeBatches.map(batch => {
+    const seat = seatsData?.data?.seats?.find(s => s.batch_id === batch._id);
+    return {
+      _id: batch._id,
+      batch_name: batch.batch_name,
+      totalSeats: seat?.seat_count || 0,
+      availableSeats: seat ? (seat.seat_count - seat.seats_assigned) : 0,
+    };
+  });
+
   // Create candidate mutation
   const createCandidateMutation = useMutation({
     mutationFn: candidatesService.createCandidate,
@@ -83,39 +101,19 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       onSuccess?.();
     },
     onError: (error: any) => {
-      // Check if error is due to batch being full
-      if (error?.response?.data?.error?.includes('full') || error?.response?.status === 400) {
-        const batchId = candidateForm.batch_id;
+      // Check if error is due to batch being full (402 status code)
+      if (error?.response?.status === 402) {
+        const errorData = error?.response?.data;
+        const batchId = errorData?.batch_id || candidateForm.batch_id;
         const batch = batches.find(b => b._id === batchId);
+        const failedCount = errorData?.failed_count || 1;
         
-        // Show payment prompt to extend seat capacity
+        // Show payment prompt to purchase more seats
         setFullBatchId(batchId);
         setFullBatchName(batch?.batch_name || 'Unknown Batch');
-        setCandidatesToAdd(1);
+        setCandidatesToAdd(failedCount);
         setShowPaymentStep(true);
       }
-    },
-  });
-
-  // Create batch mutation
-  const createBatchMutation = useMutation({
-    mutationFn: candidatesService.createBatch,
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['batches'] });
-      setCandidateForm({ ...candidateForm, batch_id: response.data._id });
-      setShowNewBatchForm(false);
-      setNewBatchForm({ batch_name: "", description: "" });
-    },
-  });
-
-  // Create batch mutation for CSV mode
-  const createBatchMutationCsv = useMutation({
-    mutationFn: candidatesService.createBatch,
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: ['batches'] });
-      setSelectedBatchForCsv(response.data._id);
-      setShowNewBatchFormCsv(false);
-      setNewBatchFormCsv({ batch_name: "", description: "" });
     },
   });
 
@@ -132,13 +130,14 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       onSuccess?.();
     },
     onError: (error: any) => {
-      // Check if error is due to batch being full
-      if (error?.response?.data?.error?.includes('full') || error?.response?.status === 400) {
-        const batchId = selectedBatchForCsv;
+      // Check if error is due to batch being full (402 status code)
+      if (error?.response?.status === 402) {
+        const errorData = error?.response?.data;
+        const batchId = errorData?.batch_id || selectedBatchForCsv;
         const batch = batches.find(b => b._id === batchId);
-        const failedCount = error?.response?.data?.failed_count || 1;
+        const failedCount = errorData?.failed_count || 1;
         
-        // Show payment prompt to extend seat capacity
+        // Show payment prompt to purchase more seats
         setFullBatchId(batchId);
         setFullBatchName(batch?.batch_name || 'Unknown Batch');
         setCandidatesToAdd(failedCount);
@@ -154,12 +153,8 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       email: "",
       batch_id: "",
     });
-    setNewBatchForm({ batch_name: "", description: "" });
-    setNewBatchFormCsv({ batch_name: "", description: "" });
     setCsvFile(null);
     setSelectedBatchForCsv("");
-    setShowNewBatchForm(false);
-    setShowNewBatchFormCsv(false);
   };
 
   const handleCandidateSubmit = (e: React.FormEvent) => {
@@ -291,64 +286,26 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Batch *
                   </label>
-                  {!showNewBatchForm ? (
-                    <div className="flex gap-2">
-                      <select
-                        required={!showNewBatchForm}
-                        value={candidateForm.batch_id}
-                        onChange={(e) => setCandidateForm({ ...candidateForm, batch_id: e.target.value })}
-                        disabled={batchesLoading}
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                      >
-                          <option value="">Select batch</option>
-                          {batches.map((batch) => (
-                            <option key={batch._id} value={batch._id}>
-                              {batch.batch_name}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowNewBatchForm(true)}
-                          className="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          title="Create new batch"
-                        >
-                          <PlusIcon className="w-5 h-5 text-gray-700 dark:text-gray-300 fill-current" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          required={showNewBatchForm}
-                          value={newBatchForm.batch_name}
-                          onChange={(e) => setNewBatchForm({ ...newBatchForm, batch_name: e.target.value })}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                          placeholder="Enter batch name"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={() => createBatchMutation.mutate(newBatchForm)}
-                            disabled={createBatchMutation.isPending}
-                            variant="primary"
-                            size="sm"
-                            className="flex-1"
-                          >
-                            {createBatchMutation.isPending ? 'Creating...' : 'Create Batch'}
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => setShowNewBatchForm(false)}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <select
+                    required
+                    value={candidateForm.batch_id}
+                    onChange={(e) => setCandidateForm({ ...candidateForm, batch_id: e.target.value })}
+                    disabled={batchesLoading}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select batch</option>
+                    {batchesWithSeats.map((batch) => (
+                      <option key={batch._id} value={batch._id}>
+                        {batch.batch_name} ({batch.availableSeats} of {batch.totalSeats} seats available)
+                      </option>
+                    ))}
+                  </select>
+                  {batchesWithSeats.length === 0 && !batchesLoading && (
+                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                      No batches available. Please create a batch with seats from the Billing page.
+                    </p>
+                  )}
+                </div>
 
                 {createCandidateMutation.isError && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
@@ -384,90 +341,50 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Select Batch *
                   </label>
-                  {!showNewBatchFormCsv ? (
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <Select
-                          value={batches.find(b => b._id === selectedBatchForCsv) ? {
-                            value: selectedBatchForCsv,
-                            label: batches.find(b => b._id === selectedBatchForCsv)?.batch_name || ''
-                          } : null}
-                          onChange={(option) => setSelectedBatchForCsv(option?.value || "")}
-                          options={batches.map(batch => ({
-                            value: batch._id,
-                            label: batch.batch_name
-                          }))}
-                          placeholder="Search or select batch..."
-                          isClearable
-                          isLoading={batchesLoading}
-                          isDisabled={batchesLoading}
-                          noOptionsMessage={({ inputValue }) => 
-                            inputValue ? `No batches found for "${inputValue}"` : "No batches available"
-                          }
-                          className="react-select-container"
-                          classNamePrefix="react-select"
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: 'rgb(209 213 219)',
-                              backgroundColor: 'white',
-                              minHeight: '42px',
-                            }),
-                            menu: (base) => ({
-                              ...base,
-                              zIndex: 10000,
-                            }),
-                          }}
-                          theme={(theme) => ({
-                            ...theme,
-                            colors: {
-                              ...theme.colors,
-                              primary: 'rgb(79 70 229)',
-                              primary25: 'rgb(238 242 255)',
-                            },
-                          })}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewBatchFormCsv(true)}
-                        className="px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Create new batch"
-                      >
-                        <PlusIcon className="w-5 h-5 text-gray-700 dark:text-gray-300 fill-current" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        required={showNewBatchFormCsv}
-                        value={newBatchFormCsv.batch_name}
-                        onChange={(e) => setNewBatchFormCsv({ ...newBatchFormCsv, batch_name: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
-                        placeholder="Enter batch name"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          onClick={() => createBatchMutationCsv.mutate(newBatchFormCsv)}
-                          disabled={createBatchMutationCsv.isPending}
-                          variant="primary"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          {createBatchMutationCsv.isPending ? 'Creating...' : 'Create Batch'}
-                        </Button>
-                        <Button
-                          type="button"
-                          onClick={() => setShowNewBatchFormCsv(false)}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
+                  <Select
+                    value={batchesWithSeats.find(b => b._id === selectedBatchForCsv) ? {
+                      value: selectedBatchForCsv,
+                      label: `${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.batch_name} (${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.availableSeats} of ${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.totalSeats} seats available)`
+                    } : null}
+                    onChange={(option) => setSelectedBatchForCsv(option?.value || "")}
+                    options={batchesWithSeats.map(batch => ({
+                      value: batch._id,
+                      label: `${batch.batch_name} (${batch.availableSeats} of ${batch.totalSeats} seats available)`
+                    }))}
+                    placeholder="Search or select batch..."
+                    isClearable
+                    isLoading={batchesLoading}
+                    isDisabled={batchesLoading}
+                    noOptionsMessage={({ inputValue }) => 
+                      inputValue ? `No batches found for "${inputValue}"` : "No batches available"
+                    }
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderColor: 'rgb(209 213 219)',
+                        backgroundColor: 'white',
+                        minHeight: '42px',
+                      }),
+                      menu: (base) => ({
+                        ...base,
+                        zIndex: 10000,
+                      }),
+                    }}
+                    theme={(theme) => ({
+                      ...theme,
+                      colors: {
+                        ...theme.colors,
+                        primary: 'rgb(79 70 229)',
+                        primary25: 'rgb(238 242 255)',
+                      },
+                    })}
+                  />
+                  {batchesWithSeats.length === 0 && !batchesLoading && (
+                    <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
+                      No batches available. Please create a batch with seats from the Billing page.
+                    </p>
                   )}
                 </div>
 
@@ -559,10 +476,9 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       {/* Payment Prompt Modal - Only shown when batch is full */}
       <PaymentPromptModal
         isOpen={showPaymentStep}
-        mode="extend"
         batchId={fullBatchId}
         batchName={fullBatchName}
-        candidateCount={candidatesToAdd}
+        minSeats={candidatesToAdd}
         onClose={() => {
           setShowPaymentStep(false);
           setFullBatchId('');
