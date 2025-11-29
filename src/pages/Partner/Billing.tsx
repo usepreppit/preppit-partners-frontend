@@ -193,7 +193,7 @@ export default function Billing() {
             </div>
             <Button
               onClick={() => {
-                setSelectedBatchForPurchase({ id: 'batch-placeholder', name: 'New Batch' });
+                setSelectedBatchForPurchase({ id: '', name: '' }); // Empty for new batch
                 setIsCreateSeatModalOpen(true);
               }}
               variant="primary"
@@ -216,7 +216,10 @@ export default function Billing() {
                 Create your first subscription to start managing candidates. Each subscription provides seats for candidates to practice.
               </p>
               <Button
-                onClick={() => setIsCreateSeatModalOpen(true)}
+                onClick={() => {
+                  setSelectedBatchForPurchase({ id: '', name: '' }); // Empty for new batch
+                  setIsCreateSeatModalOpen(true);
+                }}
                 variant="primary"
                 size="md"
                 startIcon={<PlusIcon className="w-4 h-4 fill-current" />}
@@ -243,7 +246,7 @@ export default function Billing() {
                         {seat.batch_name}
                       </h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {seat.duration_months} month{seat.duration_months > 1 ? 's' : ''} {seat.auto_renew ? '• Auto-renew' : ''}
+                        {seat.sessions_per_day === -1 ? 'Unlimited' : seat.sessions_per_day} session{seat.sessions_per_day !== 1 && seat.sessions_per_day !== -1 ? 's' : ''}/day • {seat.duration_months} month{seat.duration_months > 1 ? 's' : ''} {seat.auto_renew ? '• Auto-renew' : ''}
                       </p>
                     </div>
                     {!seat.is_active ? (
@@ -546,8 +549,9 @@ export default function Billing() {
       {selectedBatchForPurchase && (
         <PaymentPromptModal
           isOpen={isCreateSeatModalOpen}
-          batchId={selectedBatchForPurchase.id}
-          batchName={selectedBatchForPurchase.name}
+          batchId={selectedBatchForPurchase.id || undefined}
+          batchName={selectedBatchForPurchase.name || ''}
+          isNewBatch={!selectedBatchForPurchase.id} // New batch if no ID
           minSeats={10}
           onClose={() => {
             setIsCreateSeatModalOpen(false);

@@ -25,8 +25,10 @@ export interface Seat {
 
 export interface PurchaseSeatsRequest {
   seat_count: number; // minimum 10 for new batch
+  sessions_per_day: number; // 3, 5, 10, or -1 for unlimited
   months: number; // 1, 3, 6, or 12
-  batch_id: string;
+  batch_id?: string; // For existing batch
+  batch_name?: string; // For new batch
   payment_method_id: string;
   auto_renew?: boolean;
 }
