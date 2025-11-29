@@ -4,6 +4,8 @@ import Select from 'react-select';
 import { candidatesService, CreateCandidateData, CreateBatchData } from "../../services/candidates.service";
 import { CloseIcon, PlusIcon, DownloadIcon } from "../../icons";
 import Button from "../ui/button/Button";
+import PaymentPromptModal from "./PaymentPromptModal";
+import { useEffect } from "react";
 
 interface AddCandidateModalProps {
   isOpen: boolean;
@@ -19,6 +21,12 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   const [showNewBatchFormCsv, setShowNewBatchFormCsv] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [selectedBatchForCsv, setSelectedBatchForCsv] = useState<string>("");
+  
+  // Payment prompt state
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
+  const [addedCandidateIds, setAddedCandidateIds] = useState<string[]>([]);
+  const [addedCandidateCount, setAddedCandidateCount] = useState(0);
+  const [paymentBatchId, setPaymentBatchId] = useState<string | undefined>(undefined);
   
   // Single candidate form
   const [candidateForm, setCandidateForm] = useState<CreateCandidateData>({
@@ -42,6 +50,19 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
 
   const queryClient = useQueryClient();
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   // Fetch batches
   const { data: batches = [], isLoading: batchesLoading } = useQuery({
     queryKey: ['batches'],
@@ -52,11 +73,24 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   // Create candidate mutation
   const createCandidateMutation = useMutation({
     mutationFn: candidatesService.createCandidate,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      
+      // Extract candidate ID from response
+      const candidateId = response.data?._id || (response.data as any)?.id;
+      
+      // ALWAYS show payment modal when candidate is created, even if we don't have the ID
+      // Set payment data FIRST
+      setAddedCandidateIds(candidateId ? [candidateId] : []);
+      setAddedCandidateCount(1);
+      setPaymentBatchId(candidateForm.batch_id || undefined);
+      
+      // Show payment step - DON'T close the modal
+      setShowPaymentStep(true);
+      
+      // Clean up forms after setting payment step
       resetForms();
       onSuccess?.();
-      onClose();
     },
   });
 
@@ -85,11 +119,28 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   // Upload CSV mutation
   const uploadCsvMutation = useMutation({
     mutationFn: candidatesService.uploadCandidatesCsv,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      resetForms();
-      onSuccess?.();
-      onClose();
+      
+      // Extract count from CSV upload response
+      const uploadedCount = response.data?.uploaded || 0;
+      
+      if (uploadedCount > 0) {
+        // Set payment data FIRST
+        setAddedCandidateIds([]); // CSV doesn't return individual IDs
+        setAddedCandidateCount(uploadedCount);
+        setPaymentBatchId(selectedBatchForCsv || undefined);
+        
+        // Show payment step - DON'T close the modal
+        setShowPaymentStep(true);
+        
+        // Clean up forms after setting payment step
+        resetForms();
+        onSuccess?.();
+      } else {
+        resetForms();
+        onSuccess?.();
+      }
     },
   });
 
@@ -129,67 +180,73 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[99999] overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div 
-          className="fixed inset-0 bg-black/50 transition-opacity z-[99999]"
-          onClick={onClose}
-        />
-
-        {/* Modal */}
-        <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 rounded-xl shadow-xl z-[100000]">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Add Candidates
-            </h2>
-            <button
+    <>
+      {!showPaymentStep && (
+        <div className="fixed inset-0 z-[99999] overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/50 transition-opacity z-[99999]"
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <CloseIcon className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
+            />
 
-          {/* Mode Toggle */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-900">
-              <button
-                onClick={() => setMode('single')}
-                className={`flex-1 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
-                  mode === 'single'
-                    ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.03] dark:text-white'
-                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                Single Candidate
-              </button>
-              <button
-                onClick={() => setMode('batch')}
-                className={`flex-1 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
-                  mode === 'batch'
-                    ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.03] dark:text-white'
-                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-                }`}
-              >
-                Batch Upload (CSV)
-              </button>
-            </nav>
-          </div>
+            {/* Modal */}
+            <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 rounded-xl shadow-xl z-[100000]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  {showPaymentStep ? 'Complete Payment' : 'Add Candidates'}
+                </h2>
+                <button
+                  onClick={showPaymentStep ? undefined : onClose}
+                  className={`p-2 ${showPaymentStep ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-800'} rounded-lg transition-colors`}
+                >
+                  <CloseIcon className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
 
-          {/* Content */}
-          <div className="p-6 max-h-[60vh] overflow-y-auto">
-            {mode === 'single' ? (
-              /* Single Candidate Form */
-              <form onSubmit={handleCandidateSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      First Name *
-                    </label>
-                    <input
-                      type="text"
+              {!showPaymentStep && (
+                <>
+                  {/* Mode Toggle */}
+                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <nav className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-900">
+                      <button
+                        onClick={() => setMode('single')}
+                        className={`flex-1 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
+                          mode === 'single'
+                            ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.03] dark:text-white'
+                            : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        Single Candidate
+                      </button>
+                      <button
+                        onClick={() => setMode('batch')}
+                        className={`flex-1 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
+                          mode === 'batch'
+                            ? 'bg-white text-gray-900 shadow-sm dark:bg-white/[0.03] dark:text-white'
+                            : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        Batch Upload (CSV)
+                      </button>
+                    </nav>
+                  </div>
+                </>
+              )}
+
+              {/* Content */}
+              <div className="p-6 max-h-[60vh] overflow-y-auto">
+                {mode === 'single' ? (
+                  /* Single Candidate Form */
+                  <form onSubmit={handleCandidateSubmit} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
                       required
                       value={candidateForm.firstname}
                       onChange={(e) => setCandidateForm({ ...candidateForm, firstname: e.target.value })}
@@ -494,5 +551,35 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
         </div>
       </div>
     </div>
+      )}
+
+      {/* Payment Prompt Modal - Nested modal with higher z-index */}
+      <PaymentPromptModal
+        isOpen={showPaymentStep}
+        onClose={() => {
+          setShowPaymentStep(false);
+          setAddedCandidateIds([]);
+          setAddedCandidateCount(0);
+          setPaymentBatchId(undefined);
+        }}
+        candidateCount={addedCandidateCount}
+        candidateIds={addedCandidateIds}
+        batchId={paymentBatchId}
+        onPaymentComplete={() => {
+          setShowPaymentStep(false);
+          setAddedCandidateIds([]);
+          setAddedCandidateCount(0);
+          setPaymentBatchId(undefined);
+          onClose();
+        }}
+        onSkip={() => {
+          setShowPaymentStep(false);
+          setAddedCandidateIds([]);
+          setAddedCandidateCount(0);
+          setPaymentBatchId(undefined);
+          onClose();
+        }}
+      />
+    </>
   );
 }
