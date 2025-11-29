@@ -9,8 +9,39 @@ export interface PaymentMethod {
   is_default: boolean;
 }
 
+export interface Seat {
+  id: string;
+  batch_id: string;
+  batch_name: string;
+  total_seats: number;
+  used_seats: number;
+  available_seats: number;
+  sessions_per_day: number; // 3, 5, 10, or -1 for unlimited
+  duration_months: number;
+  start_date: string;
+  end_date: string;
+  renewal_date: string;
+  is_active: boolean;
+  is_ended: boolean;
+}
+
+export interface CreateSeatRequest {
+  batch_name: string;
+  total_seats: number; // minimum 10 for new batch
+  sessions_per_day: number; // 3, 5, 10, or -1 for unlimited
+  duration_months: number; // 1, 3, 6, or 12
+  payment_method_id: string;
+}
+
+export interface ExtendSeatRequest {
+  batch_id: string;
+  additional_seats: number;
+  payment_method_id: string;
+}
+
 export interface PricingRequest {
-  candidate_count: number;
+  seats: number;
+  sessions_per_day: number;
   months: number;
 }
 
@@ -21,12 +52,10 @@ export interface PricingResponse {
     amount: number;
     currency: string;
     months: number;
-    candidate_count: number;
-    new_candidates?: number;
-    unpaid_candidates_in_batch?: number;
-    total_candidates?: number;
+    seats: number;
+    sessions_per_day: number;
     breakdown: {
-      price_per_candidate: number;
+      price_per_seat: number;
       total_before_discount: number;
       discount: number;
       final_amount: number;
@@ -35,12 +64,13 @@ export interface PricingResponse {
 }
 
 export interface ProcessPaymentRequest {
-  candidate_ids: string[];
+  batch_name?: string; // For new seat purchase
+  batch_id?: string; // For extending existing seat
+  seats: number;
+  sessions_per_day: number;
+  duration_months: number;
   payment_method_id: string;
-  months: number;
   amount: number;
-  batch_id?: string;
-  include_unpaid?: boolean;
 }
 
 export interface ProcessPaymentResponse {
@@ -62,6 +92,15 @@ export interface PaymentMethodsResponse {
   };
 }
 
+export interface SeatsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    seats: Seat[];
+    total_candidates_without_plan: number;
+  };
+}
+
 export interface UnpaidCandidatesResponse {
   success: boolean;
   message: string;
@@ -80,35 +119,48 @@ export interface UnpaidCandidatesResponse {
 
 export const paymentService = {
   /**
-   * Get pricing for candidates
+   * Get pricing for seats
    */
   getPricing: async (
-    candidateCount: number, 
-    months: number, 
-    batchId?: string, 
-    includeUnpaid?: boolean
+    seats: number, 
+    sessionsPerDay: number,
+    months: number
   ): Promise<PricingResponse> => {
-    let url = `/payments/pricing?candidate_count=${candidateCount}&months=${months}`;
-    
-    if (batchId) {
-      url += `&batch_id=${batchId}`;
-    }
-    
-    if (includeUnpaid !== undefined) {
-      url += `&include_unpaid=${includeUnpaid}`;
-    }
-    
-    const response = await apiClient.get<PricingResponse>(url);
+    const response = await apiClient.get<PricingResponse>(
+      `/payments/pricing?seats=${seats}&sessions_per_day=${sessionsPerDay}&months=${months}`
+    );
     return response.data;
   },
 
   /**
-   * Get unpaid candidates in a batch
+   * Get all seats/subscriptions
    */
-  getUnpaidCandidatesInBatch: async (batchId: string): Promise<UnpaidCandidatesResponse> => {
-    const response = await apiClient.get<UnpaidCandidatesResponse>(
-      `/candidates/batches/${batchId}/unpaid`
-    );
+  getSeats: async (): Promise<SeatsResponse> => {
+    const response = await apiClient.get<SeatsResponse>('/payments/seats');
+    return response.data;
+  },
+
+  /**
+   * Create new seat (minimum 10)
+   */
+  createSeat: async (data: CreateSeatRequest): Promise<ProcessPaymentResponse> => {
+    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats', data);
+    return response.data;
+  },
+
+  /**
+   * Extend seat capacity
+   */
+  extendSeat: async (data: ExtendSeatRequest): Promise<ProcessPaymentResponse> => {
+    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats/extend', data);
+    return response.data;
+  },
+
+  /**
+   * End/sunset a batch
+   */
+  endBatch: async (batchId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post(`/payments/seats/${batchId}/end`);
     return response.data;
   },
 
@@ -121,7 +173,7 @@ export const paymentService = {
   },
 
   /**
-   * Process payment
+   * Process payment (for seat purchase or extension)
    */
   processPayment: async (data: ProcessPaymentRequest): Promise<ProcessPaymentResponse> => {
     const response = await apiClient.post<ProcessPaymentResponse>('/payments/process', data);

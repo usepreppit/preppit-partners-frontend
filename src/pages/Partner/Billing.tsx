@@ -3,14 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import PageMeta from '../../components/common/PageMeta';
 import UpdateBillingAddressModal from '../../components/modals/UpdateBillingAddressModal';
 import AddPaymentMethodModal from '../../components/modals/AddPaymentMethodModal';
+import PaymentPromptModal from '../../components/modals/PaymentPromptModal';
 import { billingService } from '../../services/billing.service';
-import { candidatesService } from '../../services/candidates.service';
-import { CheckLineIcon, PlusIcon, DownloadIcon, DollarLineIcon, PencilIcon, DocsIcon } from '../../icons';
+import { paymentService } from '../../services/payment.service';
+import { CheckLineIcon, PlusIcon, DownloadIcon, DollarLineIcon, PencilIcon, DocsIcon, UserIcon, CloseCircleIcon } from '../../icons';
 import Button from '../../components/ui/button/Button';
 
 export default function Billing() {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCreateSeatModalOpen, setIsCreateSeatModalOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch billing data
@@ -20,10 +22,10 @@ export default function Billing() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch candidates data for count
-  const { data: candidatesData } = useQuery({
-    queryKey: ['candidates', 1, 1000],
-    queryFn: () => candidatesService.getCandidates(1, 1000),
+  // Fetch seats data
+  const { data: seatsData, isLoading: seatsLoading } = useQuery({
+    queryKey: ['seats'],
+    queryFn: paymentService.getSeats,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -71,12 +73,16 @@ export default function Billing() {
     },
   });
 
-  // Cancel subscription mutation
-  const cancelSubscriptionMutation = useMutation({
-    mutationFn: billingService.cancelSubscription,
+  // End batch mutation
+  const endBatchMutation = useMutation({
+    mutationFn: paymentService.endBatch,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billing'] });
-      alert('Subscription cancelled successfully!');
+      queryClient.invalidateQueries({ queryKey: ['seats'] });
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      alert('Batch ended successfully!');
+    },
+    onError: () => {
+      alert('Failed to end batch. Please try again.');
     },
   });
 

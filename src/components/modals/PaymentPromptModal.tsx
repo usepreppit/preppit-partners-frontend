@@ -7,9 +7,15 @@ import { paymentService, PaymentMethod } from '../../services/payment.service';
 interface PaymentPromptModalProps {
   isOpen: boolean;
   onClose: () => void;
-  candidateCount: number;
-  candidateIds: string[];
+  mode: 'create' | 'extend';
+  
+  // For 'create' mode (new seat purchase)
+  batchName?: string;
+  
+  // For 'extend' mode (add capacity to existing batch)
   batchId?: string;
+  candidateCount?: number;
+  
   onPaymentComplete: () => void;
   onSkip?: () => void;
 }
@@ -17,16 +23,18 @@ interface PaymentPromptModalProps {
 export default function PaymentPromptModal({
   isOpen,
   onClose,
-  candidateCount,
-  candidateIds,
+  mode,
+  batchName,
   batchId,
+  candidateCount = 1,
   onPaymentComplete,
   onSkip,
 }: PaymentPromptModalProps) {
   const [selectedMonths, setSelectedMonths] = useState(1);
   const [selectedSessions, setSelectedSessions] = useState<number>(3);
+  const [selectedSeats, setSelectedSeats] = useState(mode === 'create' ? 10 : candidateCount);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  const [includeUnpaidCandidates, setIncludeUnpaidCandidates] = useState(false);
+  const [newBatchName, setNewBatchName] = useState(batchName || '');
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -41,12 +49,12 @@ export default function PaymentPromptModal({
     };
   }, [isOpen]);
 
-  // Fetch unpaid candidates in batch
-  const { data: unpaidCandidatesData } = useQuery({
-    queryKey: ['unpaid-candidates', batchId],
-    queryFn: () => paymentService.getUnpaidCandidatesInBatch(batchId!),
-    enabled: isOpen && !!batchId,
-  });
+  // Update seats when candidateCount changes (for extend mode)
+  useEffect(() => {
+    if (mode === 'extend' && candidateCount) {
+      setSelectedSeats(candidateCount);
+    }
+  }, [mode, candidateCount]);
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
@@ -55,23 +63,31 @@ export default function PaymentPromptModal({
     enabled: isOpen,
   });
 
-  // Fetch pricing based on candidate count and months
+  // Fetch pricing based on seats, sessions, and months
   const { data: pricingData, isLoading: isPricingLoading } = useQuery({
-    queryKey: ['pricing', candidateCount, selectedMonths, batchId, includeUnpaidCandidates],
-    queryFn: () => paymentService.getPricing(
-      candidateCount, 
-      selectedMonths, 
-      batchId, 
-      includeUnpaidCandidates
-    ),
-    enabled: isOpen && candidateCount > 0,
+    queryKey: ['pricing', selectedSeats, selectedSessions, selectedMonths],
+    queryFn: () => paymentService.getPricing(selectedSeats, selectedSessions, selectedMonths),
+    enabled: isOpen && selectedSeats > 0,
   });
 
-  // Process payment mutation
-  const processPaymentMutation = useMutation({
-    mutationFn: paymentService.processPayment,
+  // Create seat mutation (for 'create' mode)
+  const createSeatMutation = useMutation({
+    mutationFn: paymentService.createSeat,
     onSuccess: () => {
-      alert('Payment processed successfully!');
+      alert('Subscription created successfully!');
+      onPaymentComplete();
+      onClose();
+    },
+    onError: () => {
+      alert('Payment failed. Please try again.');
+    },
+  });
+
+  // Extend seat mutation (for 'extend' mode)
+  const extendSeatMutation = useMutation({
+    mutationFn: paymentService.extendSeat,
+    onSuccess: () => {
+      alert('Capacity extended successfully!');
       onPaymentComplete();
       onClose();
     },
@@ -100,19 +116,38 @@ export default function PaymentPromptModal({
       return;
     }
 
-    processPaymentMutation.mutate({
-      candidate_ids: candidateIds,
-      payment_method_id: selectedPaymentMethod,
-      months: selectedMonths,
-      amount: pricingData.data.amount,
-      batch_id: batchId,
-      include_unpaid: includeUnpaidCandidates,
-    });
+    if (mode === 'create') {
+      if (!newBatchName.trim()) {
+        alert('Please enter a batch name');
+        return;
+      }
+      
+      createSeatMutation.mutate({
+        batch_name: newBatchName,
+        total_seats: selectedSeats,
+        sessions_per_day: selectedSessions,
+        duration_months: selectedMonths,
+        payment_method_id: selectedPaymentMethod,
+      });
+    } else {
+      // mode === 'extend'
+      if (!batchId) {
+        alert('Batch ID is required');
+        return;
+      }
+      
+      extendSeatMutation.mutate({
+        batch_id: batchId,
+        additional_seats: selectedSeats,
+        payment_method_id: selectedPaymentMethod,
+      });
+    }
   };
 
   if (!isOpen) return null;
 
   const paymentMethods = paymentMethodsData?.data?.payment_methods || [];
+  const isProcessing = createSeatMutation.isPending || extendSeatMutation.isPending;
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center">
@@ -132,10 +167,12 @@ export default function PaymentPromptModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                Complete Payment
+                {mode === 'create' ? 'Create New Subscription' : 'Extend Batch Capacity'}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {candidateCount} candidate{candidateCount > 1 ? 's' : ''} added successfully
+                {mode === 'create' 
+                  ? 'Purchase seats for a new batch (minimum 10 seats)' 
+                  : `Add ${candidateCount} seat${candidateCount > 1 ? 's' : ''} to continue adding candidates`}
               </p>
             </div>
           </div>
@@ -151,32 +188,45 @@ export default function PaymentPromptModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Include Unpaid Candidates from Batch */}
-          {batchId && unpaidCandidatesData?.data && unpaidCandidatesData.data.count > 0 && (
-            <div className="rounded-lg border-2 border-primary-200 bg-primary-50 dark:border-primary-800 dark:bg-primary-900/20 p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeUnpaidCandidates}
-                  onChange={(e) => setIncludeUnpaidCandidates(e.target.checked)}
-                  className="mt-1 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Include {unpaidCandidatesData.data.count} unpaid candidate{unpaidCandidatesData.data.count > 1 ? 's' : ''} from this batch
-                  </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    This batch has {unpaidCandidatesData.data.count} unpaid candidate{unpaidCandidatesData.data.count > 1 ? 's' : ''}. Check this box to include {unpaidCandidatesData.data.count > 1 ? 'them' : 'it'} in this payment and save on processing fees.
-                  </p>
-                </div>
+          {/* Batch Name (only for create mode) */}
+          {mode === 'create' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Batch Name
               </label>
+              <input
+                type="text"
+                value={newBatchName}
+                onChange={(e) => setNewBatchName(e.target.value)}
+                placeholder="Enter batch name"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
             </div>
           )}
 
-          {/* Sessions Per Month */}
+          {/* Number of Seats (only for create mode) */}
+          {mode === 'create' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Number of Seats (Minimum 10)
+              </label>
+              <input
+                type="number"
+                min="10"
+                value={selectedSeats}
+                onChange={(e) => setSelectedSeats(Math.max(10, parseInt(e.target.value) || 10))}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Each seat allows one candidate to practice
+              </p>
+            </div>
+          )}
+
+          {/* Sessions Per Day */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Sessions Per Month
+              Sessions Per Day
             </label>
             <div className="grid grid-cols-4 gap-3">
               {[3, 5, 10, 'unlimited'].map((sessions) => (
@@ -230,9 +280,9 @@ export default function PaymentPromptModal({
           {/* Summary */}
           <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 p-4">
             <div className="text-sm text-gray-700 dark:text-gray-300">
-              <span className="font-semibold">{includeUnpaidCandidates && unpaidCandidatesData?.data ? (candidateCount + unpaidCandidatesData.data.count) : candidateCount} candidate{(includeUnpaidCandidates && unpaidCandidatesData?.data ? (candidateCount + unpaidCandidatesData.data.count) : candidateCount) > 1 ? 's' : ''}</span>
+              <span className="font-semibold">{selectedSeats} seat{selectedSeats > 1 ? 's' : ''}</span>
               {' × '}
-              <span className="font-semibold">{selectedSessions === -1 ? 'unlimited' : selectedSessions} session{selectedSessions !== 1 && selectedSessions !== -1 ? 's' : ''}/month</span>
+              <span className="font-semibold">{selectedSessions === -1 ? 'unlimited' : selectedSessions} session{selectedSessions !== 1 && selectedSessions !== -1 ? 's' : ''}/day</span>
               {' × '}
               <span className="font-semibold">{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
             </div>
@@ -250,29 +300,14 @@ export default function PaymentPromptModal({
                 Pricing Breakdown
               </h3>
               <div className="space-y-2 text-sm">
-                {pricingData.data.new_candidates !== undefined && pricingData.data.unpaid_candidates_in_batch !== undefined ? (
-                  <>
-                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                      <span>{pricingData.data.new_candidates} new candidate{pricingData.data.new_candidates > 1 ? 's' : ''}</span>
-                      <span></span>
-                    </div>
-                    {pricingData.data.unpaid_candidates_in_batch > 0 && (
-                      <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                        <span>{pricingData.data.unpaid_candidates_in_batch} unpaid candidate{pricingData.data.unpaid_candidates_in_batch > 1 ? 's' : ''} (from batch)</span>
-                        <span></span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-gray-600 dark:text-gray-400 pt-1">
-                      <span>{pricingData.data.total_candidates} total × {selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
-                      <span>${pricingData.data.breakdown?.total_before_discount?.toFixed(2) || '0.00'}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                    <span>{candidateCount} candidate{candidateCount > 1 ? 's' : ''} × {selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
-                    <span>${pricingData.data.breakdown?.total_before_discount?.toFixed(2) || '0.00'}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                  <span>{pricingData.data.seats} seat{pricingData.data.seats > 1 ? 's' : ''} × ${pricingData.data.breakdown?.price_per_seat?.toFixed(2) || '0.00'}</span>
+                  <span>${(pricingData.data.seats * (pricingData.data.breakdown?.price_per_seat || 0)).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                  <span>{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
+                  <span></span>
+                </div>
                 {pricingData.data.breakdown?.discount > 0 && (
                   <div className="flex justify-between text-green-600 dark:text-green-400">
                     <span>Discount</span>
@@ -349,16 +384,16 @@ export default function PaymentPromptModal({
             size="md"
             className="flex-1"
           >
-            {onSkip ? 'Skip Payment' : 'Pay Later'}
+            {onSkip ? 'Skip Payment' : 'Cancel'}
           </Button>
           <Button
             onClick={handlePayment}
             variant="primary"
             size="md"
             className="flex-1"
-            disabled={!selectedPaymentMethod || isPricingLoading || processPaymentMutation.isPending}
+            disabled={!selectedPaymentMethod || isPricingLoading || isProcessing || (mode === 'create' && selectedSeats < 10)}
           >
-            {processPaymentMutation.isPending ? 'Processing...' : `Pay $${pricingData?.data?.amount?.toFixed(2) || '0.00'}`}
+            {isProcessing ? 'Processing...' : `Pay $${pricingData?.data?.amount?.toFixed(2) || '0.00'}`}
           </Button>
         </div>
       </div>

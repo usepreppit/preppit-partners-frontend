@@ -22,11 +22,11 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [selectedBatchForCsv, setSelectedBatchForCsv] = useState<string>("");
   
-  // Payment prompt state
+  // Payment prompt state (only when batch is full)
   const [showPaymentStep, setShowPaymentStep] = useState(false);
-  const [addedCandidateIds, setAddedCandidateIds] = useState<string[]>([]);
-  const [addedCandidateCount, setAddedCandidateCount] = useState(0);
-  const [paymentBatchId, setPaymentBatchId] = useState<string | undefined>(undefined);
+  const [fullBatchId, setFullBatchId] = useState<string>('');
+  const [fullBatchName, setFullBatchName] = useState<string>('');
+  const [candidatesToAdd, setCandidatesToAdd] = useState(0);
   
   // Single candidate form
   const [candidateForm, setCandidateForm] = useState<CreateCandidateData>({
@@ -73,24 +73,27 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   // Create candidate mutation
   const createCandidateMutation = useMutation({
     mutationFn: candidatesService.createCandidate,
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['seats'] }); // Refresh seats data
       
-      // Extract candidate ID from response
-      const candidateId = response.data?._id || (response.data as any)?.id;
-      
-      // ALWAYS show payment modal when candidate is created, even if we don't have the ID
-      // Set payment data FIRST
-      setAddedCandidateIds(candidateId ? [candidateId] : []);
-      setAddedCandidateCount(1);
-      setPaymentBatchId(candidateForm.batch_id || undefined);
-      
-      // Show payment step - DON'T close the modal
-      setShowPaymentStep(true);
-      
-      // Clean up forms after setting payment step
+      // Close modal and reset forms
       resetForms();
+      onClose();
       onSuccess?.();
+    },
+    onError: (error: any) => {
+      // Check if error is due to batch being full
+      if (error?.response?.data?.error?.includes('full') || error?.response?.status === 400) {
+        const batchId = candidateForm.batch_id;
+        const batch = batches.find(b => b._id === batchId);
+        
+        // Show payment prompt to extend seat capacity
+        setFullBatchId(batchId);
+        setFullBatchName(batch?.batch_name || 'Unknown Batch');
+        setCandidatesToAdd(1);
+        setShowPaymentStep(true);
+      }
     },
   });
 
@@ -119,27 +122,27 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   // Upload CSV mutation
   const uploadCsvMutation = useMutation({
     mutationFn: candidatesService.uploadCandidatesCsv,
-    onSuccess: (response) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['seats'] }); // Refresh seats data
       
-      // Extract count from CSV upload response
-      const uploadedCount = response.data?.uploaded || 0;
-      
-      if (uploadedCount > 0) {
-        // Set payment data FIRST
-        setAddedCandidateIds([]); // CSV doesn't return individual IDs
-        setAddedCandidateCount(uploadedCount);
-        setPaymentBatchId(selectedBatchForCsv || undefined);
+      // Close modal and reset forms
+      resetForms();
+      onClose();
+      onSuccess?.();
+    },
+    onError: (error: any) => {
+      // Check if error is due to batch being full
+      if (error?.response?.data?.error?.includes('full') || error?.response?.status === 400) {
+        const batchId = selectedBatchForCsv;
+        const batch = batches.find(b => b._id === batchId);
+        const failedCount = error?.response?.data?.failed_count || 1;
         
-        // Show payment step - DON'T close the modal
+        // Show payment prompt to extend seat capacity
+        setFullBatchId(batchId);
+        setFullBatchName(batch?.batch_name || 'Unknown Batch');
+        setCandidatesToAdd(failedCount);
         setShowPaymentStep(true);
-        
-        // Clean up forms after setting payment step
-        resetForms();
-        onSuccess?.();
-      } else {
-        resetForms();
-        onSuccess?.();
       }
     },
   });
@@ -553,30 +556,31 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     </div>
       )}
 
-      {/* Payment Prompt Modal - Nested modal with higher z-index */}
+      {/* Payment Prompt Modal - Only shown when batch is full */}
       <PaymentPromptModal
         isOpen={showPaymentStep}
+        mode="extend"
+        batchId={fullBatchId}
+        batchName={fullBatchName}
+        candidateCount={candidatesToAdd}
         onClose={() => {
           setShowPaymentStep(false);
-          setAddedCandidateIds([]);
-          setAddedCandidateCount(0);
-          setPaymentBatchId(undefined);
+          setFullBatchId('');
+          setFullBatchName('');
+          setCandidatesToAdd(0);
         }}
-        candidateCount={addedCandidateCount}
-        candidateIds={addedCandidateIds}
-        batchId={paymentBatchId}
         onPaymentComplete={() => {
           setShowPaymentStep(false);
-          setAddedCandidateIds([]);
-          setAddedCandidateCount(0);
-          setPaymentBatchId(undefined);
+          setFullBatchId('');
+          setFullBatchName('');
+          setCandidatesToAdd(0);
           onClose();
         }}
         onSkip={() => {
           setShowPaymentStep(false);
-          setAddedCandidateIds([]);
-          setAddedCandidateCount(0);
-          setPaymentBatchId(undefined);
+          setFullBatchId('');
+          setFullBatchName('');
+          setCandidatesToAdd(0);
           onClose();
         }}
       />
