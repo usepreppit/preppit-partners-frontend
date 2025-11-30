@@ -9,38 +9,47 @@ import EngagementHeatmap from '../../components/analytics/EngagementHeatmap';
 import CandidateLeaderboard from '../../components/analytics/CandidateLeaderboard';
 import ExamCategoryBarChart from '../../components/analytics/ExamCategoryBarChart';
 import PracticeTypeDistribution from '../../components/analytics/PracticeTypeDistribution';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Analytics() {
+  const { user } = useAuth();
   const [metricsPeriod, setMetricsPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [atRiskPage, setAtRiskPage] = useState(1);
   const atRiskLimit = 20;
 
-  // Fetch analytics overview
+  // Check if onboarding is completed
+  const isOnboardingCompleted = user?.onboarding_status?.is_completed ?? false;
+
+  // Fetch analytics overview (only if onboarding is completed)
   const { data: overviewData, isLoading: overviewLoading } = useQuery({
     queryKey: ['analytics-overview'],
     queryFn: analyticsService.getOverview,
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
-  // Fetch performance data
+  // Fetch performance data (only if onboarding is completed)
   const { data: performanceData, isLoading: performanceLoading } = useQuery({
     queryKey: ['analytics-performance'],
     queryFn: analyticsService.getPerformance,
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
-  // Fetch practice metrics
+  // Fetch practice metrics (only if onboarding is completed)
   const { data: metricsData, isLoading: metricsLoading } = useQuery({
     queryKey: ['analytics-metrics', metricsPeriod],
     queryFn: () => analyticsService.getPracticeMetrics(metricsPeriod),
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
-  // Fetch at-risk candidates
+  // Fetch at-risk candidates (only if onboarding is completed)
   const { data: atRiskData, isLoading: atRiskLoading } = useQuery({
     queryKey: ['analytics-at-risk', atRiskPage],
     queryFn: () => analyticsService.getAtRiskCandidates(atRiskPage, atRiskLimit),
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
   if (overviewLoading) {

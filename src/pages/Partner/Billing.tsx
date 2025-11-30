@@ -8,8 +8,10 @@ import { paymentService } from '../../services/payment.service';
 import { PlusIcon, UserIcon, PencilIcon, TrashBinIcon } from '../../icons';
 import Button from '../../components/ui/button/Button';
 import { Transaction } from '../../types/api.types';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Billing() {
+  const { user } = useAuth();
   const [isCreateSeatModalOpen, setIsCreateSeatModalOpen] = useState(false);
   const [selectedBatchForPurchase, setSelectedBatchForPurchase] = useState<{ id: string; name: string } | null>(null);
   const [isUpdateAddressModalOpen, setIsUpdateAddressModalOpen] = useState(false);
@@ -17,6 +19,9 @@ export default function Billing() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const queryClient = useQueryClient();
+
+  // Check if onboarding is completed
+  const isOnboardingCompleted = user?.onboarding_status?.is_completed ?? false;
 
   // Sample billing address data
   const sampleBillingAddress = {
@@ -27,25 +32,28 @@ export default function Billing() {
     country: 'United States'
   };
 
-  // Fetch seats data
+  // Fetch seats data (only if onboarding is completed)
   const { data: seatsData, isLoading: seatsLoading } = useQuery({
     queryKey: ['seats'],
     queryFn: paymentService.getSeats,
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
-  // Fetch payment methods
+  // Fetch payment methods (only if onboarding is completed)
   const { data: paymentMethodsData, isLoading: paymentMethodsLoading } = useQuery({
     queryKey: ['payment-methods'],
     queryFn: paymentService.getPaymentMethods,
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
-  // Fetch transactions
+  // Fetch transactions (only if onboarding is completed)
   const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
     queryKey: ['transactions', currentPage],
     queryFn: () => paymentService.getTransactions({ page: currentPage, limit: 20 }),
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted,
   });
 
   // Update billing address mutation

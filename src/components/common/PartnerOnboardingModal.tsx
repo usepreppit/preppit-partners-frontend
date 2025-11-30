@@ -1,4 +1,5 @@
 import { useState, FormEvent, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -8,6 +9,7 @@ import PhoneInput from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import Select from 'react-select';
 import { countries } from 'countries-list';
+import { onboardingService } from "../../services/onboarding.service";
 
 // Country code to timezone mapping
 const COUNTRY_TIMEZONE_MAP: Record<string, string> = {
@@ -36,14 +38,6 @@ interface PartnerOnboardingModalProps {
   isOpen: boolean;
   onComplete: (profileData: PartnerProfile) => void;
 }
-
-const AVAILABLE_EXAMS = [
-  { id: "pebc-osce", name: "PEBC OSCE" },
-  { id: "ielts", name: "IELTS" },
-  { id: "oet", name: "OET" },
-  { id: "pte", name: "PTE Academic" },
-  { id: "toefl", name: "TOEFL" },
-];
 
 const CURRENCIES = [
   { code: "USD", name: "US Dollar" },
@@ -78,6 +72,16 @@ export default function PartnerOnboardingModal({
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuthContext();
+
+  // Fetch exam types from API
+  const { data: examTypesData, isLoading: examTypesLoading } = useQuery({
+    queryKey: ['exam-types'],
+    queryFn: onboardingService.getExamTypes,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: isOpen, // Only fetch when modal is open
+  });
+
+  const availableExams = examTypesData?.data?.exams || [];
 
   // Form state
   const [organizationName, setOrganizationName] = useState("");
@@ -313,44 +317,76 @@ export default function PartnerOnboardingModal({
                 <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
                   Choose the exams you want to onboard candidates for. You can select multiple exams.
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {AVAILABLE_EXAMS.map((exam) => (
-                    <div
-                      key={exam.id}
-                      onClick={() => handleExamToggle(exam.id)}
-                      className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        selectedExams.includes(exam.id)
-                          ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 dark:border-brand-400"
-                          : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
-                      }`}
-                    >
-                      <div
-                        className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
-                          selectedExams.includes(exam.id)
-                            ? "border-brand-500 bg-brand-500"
-                            : "border-gray-300 dark:border-gray-600"
-                        }`}
-                      >
-                        {selectedExams.includes(exam.id) && (
-                          <svg
-                            className="w-3 h-3 text-white"
-                            fill="none"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="3"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                
+                {examTypesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+                    <span className="ml-3 text-gray-600 dark:text-gray-400">Loading exam types...</span>
+                  </div>
+                ) : availableExams.length === 0 ? (
+                  <div className="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    No exam types available at the moment. Please contact support.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {availableExams.map((exam) => {
+                      const isPublished = exam.status === 'published';
+                      const isSelected = selectedExams.includes(exam.exam_id);
+                      
+                      return (
+                        <div
+                          key={exam.exam_id}
+                          onClick={() => isPublished && handleExamToggle(exam.exam_id)}
+                          className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all ${
+                            !isPublished 
+                              ? "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50 cursor-not-allowed opacity-60"
+                              : isSelected
+                              ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20 dark:border-brand-400 cursor-pointer"
+                              : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600 cursor-pointer"
+                          }`}
+                        >
+                          <div
+                            className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                              !isPublished
+                                ? "border-gray-300 bg-gray-200 dark:border-gray-600 dark:bg-gray-700"
+                                : isSelected
+                                ? "border-brand-500 bg-brand-500"
+                                : "border-gray-300 dark:border-gray-600"
+                            }`}
                           >
-                            <path d="M5 13l4 4L19 7"></path>
-                          </svg>
-                        )}
-                      </div>
-                      <span className="font-medium text-gray-700 dark:text-gray-200">
-                        {exam.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                            {isSelected && isPublished && (
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="none"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="3"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path d="M5 13l4 4L19 7"></path>
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className={`font-medium ${
+                              isPublished 
+                                ? "text-gray-700 dark:text-gray-200" 
+                                : "text-gray-500 dark:text-gray-400"
+                            }`}>
+                              {exam.title}
+                            </span>
+                            {!isPublished && (
+                              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                Coming Soon
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}

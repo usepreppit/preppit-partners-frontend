@@ -10,8 +10,10 @@ import AddCandidateModal from "../../components/modals/AddCandidateModal";
 import CandidateDetailsModal from "../../components/modals/CandidateDetailsModal";
 import { candidatesService, Candidate } from "../../services/candidates.service";
 import { PlusIcon, DownloadIcon, ListIcon, UserIcon, EnvelopeIcon } from "../../icons";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function Candidates() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [batchFilter, setBatchFilter] = useState<string>("all");
@@ -23,7 +25,10 @@ export default function Candidates() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const itemsPerPage = 20;
 
-  // Fetch candidates from API
+  // Check if onboarding is completed
+  const isOnboardingCompleted = user?.onboarding_status?.is_completed ?? false;
+
+  // Fetch candidates from API (only if onboarding is completed)
   const {
     data: candidatesData,
     isLoading,
@@ -34,6 +39,7 @@ export default function Candidates() {
     queryKey: ['candidates', currentPage, itemsPerPage],
     queryFn: () => candidatesService.getCandidates(currentPage, itemsPerPage),
     staleTime: 30000, // 30 seconds
+    enabled: isOnboardingCompleted, // Only fetch when onboarding is complete
   });
 
   const candidates = candidatesData?.data?.candidates || [];

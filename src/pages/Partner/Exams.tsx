@@ -6,8 +6,10 @@ import { FileIcon, UserIcon, CheckCircleIcon } from '../../icons';
 import Button from '../../components/ui/button/Button';
 import ExamDetailsModal from '../../components/modals/ExamDetailsModal';
 import ExamSessionsModal from '../../components/modals/ExamSessionsModal';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Exams() {
+  const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -16,11 +18,15 @@ export default function Exams() {
   const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
   const limit = 12;
 
-  // Fetch exams
+  // Check if onboarding is completed
+  const isOnboardingCompleted = user?.onboarding_status?.is_completed ?? false;
+
+  // Fetch exams (only if onboarding is completed)
   const { data: examsData, isLoading } = useQuery({
     queryKey: ['exams', currentPage],
     queryFn: () => examService.getExams(currentPage, limit),
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted, // Only fetch when onboarding is complete
   });
 
   const handleViewDetails = (exam: Exam) => {

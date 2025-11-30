@@ -12,7 +12,10 @@ import { candidatesService } from '../../services/candidates.service';
 export default function PartnerDashboard() {
   const { user } = useAuth();
 
-  // Fetch dashboard data from API
+  // Check if onboarding is completed
+  const isOnboardingCompleted = user?.onboarding_status?.is_completed ?? false;
+
+  // Fetch dashboard data from API (only if onboarding is completed)
   const {
     data: dashboardData,
     isLoading,
@@ -23,9 +26,10 @@ export default function PartnerDashboard() {
     queryFn: partnerDashboardService.getDashboard,
     staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
     retry: 2,
+    enabled: isOnboardingCompleted, // Only fetch when onboarding is complete
   });
 
-  // Fetch candidates data for accurate statistics
+  // Fetch candidates data for accurate statistics (only if onboarding is completed)
   const {
     data: candidatesData,
     isLoading: candidatesLoading,
@@ -33,6 +37,7 @@ export default function PartnerDashboard() {
     queryKey: ['candidatesStats'],
     queryFn: () => candidatesService.getCandidates(1, 1000), // Fetch large batch for stats
     staleTime: 5 * 60 * 1000,
+    enabled: isOnboardingCompleted, // Only fetch when onboarding is complete
   });
 
   // Calculate candidate statistics from real data
