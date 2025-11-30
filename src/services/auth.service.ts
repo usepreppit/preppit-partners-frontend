@@ -32,10 +32,8 @@ export const authService = {
   register: async (userData: RegisterRequest): Promise<ApiResponse<RegisterResponse>> => {
     const response = await apiService.post<ApiResponse<RegisterResponse>>('/auth/register', userData);
     
-    // Store JWT token in localStorage
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-    }
+    // Don't store token - user needs to verify email first
+    // Token will be stored after email verification
     
     return response;
   },
@@ -86,5 +84,14 @@ export const authService = {
    */
   getToken: (): string | null => {
     return localStorage.getItem('token');
+  },
+
+  /**
+   * Verify email with token
+   */
+  verifyEmail: async (email: string, verifyToken: string): Promise<ApiResponse<{ message: string }>> => {
+    return apiService.get<ApiResponse<{ message: string }>>(
+      `/auth/verify_email?email=${encodeURIComponent(email)}&verify_token=${encodeURIComponent(verifyToken)}`
+    );
   },
 };

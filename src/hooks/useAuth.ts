@@ -41,16 +41,16 @@ export const useLogin = () => {
  */
 export const useRegister = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (userData: RegisterRequest) => authService.register(userData),
-    onSuccess: (data) => {
-      // Store user data in cache
-      queryClient.setQueryData(authKeys.currentUser, data.data.user);
+    onSuccess: () => {
+      // Don't store token yet - user needs to verify email first
+      // Remove token from localStorage if it was stored
+      localStorage.removeItem('token');
       
-      // Navigate to signup success page
-      navigate('/signup-success');
+      // Navigate to verify email pending page
+      navigate('/verify-email-pending');
     },
   });
 };

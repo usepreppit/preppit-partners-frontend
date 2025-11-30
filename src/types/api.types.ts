@@ -18,6 +18,8 @@ export interface ApiErrorResponse {
   statusCode: number;
   errors?: Record<string, string[]>;
   details?: {
+    success?: boolean;
+    statusCode?: number;
     message?: string;
   };
 }

@@ -13,6 +13,8 @@ import Billing from "./pages/Partner/Billing";
 import Analytics from "./pages/Partner/Analytics";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
+import VerifyEmail from "./pages/AuthPages/VerifyEmail";
+import VerifyEmailPending from "./pages/AuthPages/VerifyEmailPending";
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
 import Carousel from "./pages/UiElements/Carousel";
@@ -169,6 +171,8 @@ export default function App() {
 
           {/* Public Routes (accessible to all users) */}
           <Route path="/signup-success" element={<SignUpSuccess />} />
+          <Route path="/verify-email-pending" element={<VerifyEmailPending />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Fallback Route */}
           <Route path="*" element={<NotFound />} />
