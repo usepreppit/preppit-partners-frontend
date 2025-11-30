@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Select from 'react-select';
 import { candidatesService, CreateCandidateData } from "../../services/candidates.service";
-import { paymentService } from "../../services/payment.service";
 import { CloseIcon, DownloadIcon } from "../../icons";
 import Button from "../ui/button/Button";
 import PaymentPromptModal from "./PaymentPromptModal";
@@ -57,43 +56,29 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     };
   }, [isOpen]);
 
-  // Fetch batches
-  const { data: batches = [], isLoading: batchesLoading } = useQuery({
-    queryKey: ['batches'],
-    queryFn: candidatesService.getBatches,
+  // Fetch seat subscriptions (replaces batches and seats queries)
+  const { data: subscriptionsData, isLoading: subscriptionsLoading } = useQuery({
+    queryKey: ['seat-subscriptions'],
+    queryFn: candidatesService.getSeatSubscriptions,
     enabled: isOpen,
   });
 
-  // Fetch seats to filter out ended batches
-  const { data: seatsData } = useQuery({
-    queryKey: ['seats'],
-    queryFn: paymentService.getSeats,
-    enabled: isOpen,
-  });
-
-  // Filter out inactive batches
-  const activeBatches = batches.filter(batch => {
-    const seat = seatsData?.data?.seats?.find(s => s.batch_id === batch._id);
-    return !seat || seat.is_active; // Show batch if no seat found or seat is active
-  });
-
-  // Filter out inactive batches and add seat information
-  const batchesWithSeats: BatchWithSeats[] = activeBatches.map(batch => {
-    const seat = seatsData?.data?.seats?.find(s => s.batch_id === batch._id);
-    return {
-      _id: batch._id,
-      batch_name: batch.batch_name,
-      totalSeats: seat?.seat_count || 0,
-      availableSeats: seat ? (seat.seat_count - seat.seats_assigned) : 0,
-    };
-  });
+  // Filter active subscriptions and map to batches with seats
+  const batchesWithSeats: BatchWithSeats[] = (subscriptionsData?.data?.subscriptions || [])
+    .filter(sub => sub.is_active) // Only show active subscriptions
+    .map(sub => ({
+      _id: sub.batch_id,
+      batch_name: sub.batch_name,
+      totalSeats: sub.seat_count,
+      availableSeats: sub.seats_available,
+    }));
 
   // Create candidate mutation
   const createCandidateMutation = useMutation({
     mutationFn: candidatesService.createCandidate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      queryClient.invalidateQueries({ queryKey: ['seats'] }); // Refresh seats data
+      queryClient.invalidateQueries({ queryKey: ['seat-subscriptions'] }); // Refresh subscriptions data
       
       // Close modal and reset forms
       resetForms();
@@ -105,12 +90,12 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       if (error?.response?.status === 402) {
         const errorData = error?.response?.data;
         const batchId = errorData?.batch_id || candidateForm.batch_id;
-        const batch = batches.find(b => b._id === batchId);
+        const subscription = subscriptionsData?.data?.subscriptions?.find(s => s.batch_id === batchId);
         const failedCount = errorData?.failed_count || 1;
         
         // Show payment prompt to purchase more seats
         setFullBatchId(batchId);
-        setFullBatchName(batch?.batch_name || 'Unknown Batch');
+        setFullBatchName(subscription?.batch_name || 'Unknown Batch');
         setCandidatesToAdd(failedCount);
         setShowPaymentStep(true);
       }
@@ -122,7 +107,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     mutationFn: candidatesService.uploadCandidatesCsv,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
-      queryClient.invalidateQueries({ queryKey: ['seats'] }); // Refresh seats data
+      queryClient.invalidateQueries({ queryKey: ['seat-subscriptions'] }); // Refresh subscriptions data
       
       // Close modal and reset forms
       resetForms();
@@ -134,12 +119,12 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
       if (error?.response?.status === 402) {
         const errorData = error?.response?.data;
         const batchId = errorData?.batch_id || selectedBatchForCsv;
-        const batch = batches.find(b => b._id === batchId);
+        const subscription = subscriptionsData?.data?.subscriptions?.find(s => s.batch_id === batchId);
         const failedCount = errorData?.failed_count || 1;
         
         // Show payment prompt to purchase more seats
         setFullBatchId(batchId);
-        setFullBatchName(batch?.batch_name || 'Unknown Batch');
+        setFullBatchName(subscription?.batch_name || 'Unknown Batch');
         setCandidatesToAdd(failedCount);
         setShowPaymentStep(true);
       }
@@ -290,7 +275,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                     required
                     value={candidateForm.batch_id}
                     onChange={(e) => setCandidateForm({ ...candidateForm, batch_id: e.target.value })}
-                    disabled={batchesLoading}
+                    disabled={subscriptionsLoading}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">Select batch</option>
@@ -300,7 +285,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                       </option>
                     ))}
                   </select>
-                  {batchesWithSeats.length === 0 && !batchesLoading && (
+                  {batchesWithSeats.length === 0 && !subscriptionsLoading && (
                     <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                       No batches available. Please create a batch with seats from the Billing page.
                     </p>
@@ -353,8 +338,8 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                     }))}
                     placeholder="Search or select batch..."
                     isClearable
-                    isLoading={batchesLoading}
-                    isDisabled={batchesLoading}
+                    isLoading={subscriptionsLoading}
+                    isDisabled={subscriptionsLoading}
                     noOptionsMessage={({ inputValue }) => 
                       inputValue ? `No batches found for "${inputValue}"` : "No batches available"
                     }
@@ -381,7 +366,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                       },
                     })}
                   />
-                  {batchesWithSeats.length === 0 && !batchesLoading && (
+                  {batchesWithSeats.length === 0 && !subscriptionsLoading && (
                     <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                       No batches available. Please create a batch with seats from the Billing page.
                     </p>

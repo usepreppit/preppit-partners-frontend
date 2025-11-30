@@ -1,4 +1,5 @@
 import apiClient from './api/apiClient';
+import { Transaction, TransactionsResponse, BillingAddress } from '../types/api.types';
 
 export interface PaymentMethod {
   id: string;
@@ -30,6 +31,7 @@ export interface PurchaseSeatsRequest {
   batch_id?: string; // For existing batch
   batch_name?: string; // For new batch
   payment_method_id: string;
+  setup_intent_id?: string; // Stripe Setup Intent ID (when card is just saved)
   auto_renew?: boolean;
 }
 
@@ -43,16 +45,18 @@ export interface PricingResponse {
   success: boolean;
   message: string;
   data: {
-    amount: number;
-    currency: string;
-    months: number;
-    seats: number;
-    sessions_per_day: number;
+    per_candidate: number;
+    total: number;
     breakdown: {
-      price_per_seat: number;
-      total_before_discount: number;
-      discount: number;
-      final_amount: number;
+      seat_count: number;
+      sessions_per_day: number;
+      months: number;
+      monthly_sessions: number;
+      cost_per_month: number;
+      base_price_per_candidate_per_month: number;
+      volume_discount: number;
+      final_price_per_candidate_per_month: number;
+      final_price_per_candidate_total: number;
     };
   };
 }
@@ -121,7 +125,7 @@ export const paymentService = {
     months: number
   ): Promise<PricingResponse> => {
     const response = await apiClient.get<PricingResponse>(
-      `/payments/pricing?seats=${seats}&sessions_per_day=${sessionsPerDay}&months=${months}`
+      `/subscriptions/seats/pricing?seat_count=${seats}&sessions_per_day=${sessionsPerDay}&months=${months}`
     );
     return response.data;
   },
@@ -130,15 +134,16 @@ export const paymentService = {
    * Get all seats/subscriptions
    */
   getSeats: async (): Promise<SeatsResponse> => {
-    const response = await apiClient.get<SeatsResponse>('/payments/seats');
+    const response = await apiClient.get<SeatsResponse>('/subscriptions/seats');
     return response.data;
   },
 
   /**
-   * Purchase seats for a batch (minimum 10)
+   * Purchase seats for a batch (with saved payment method)
+   * This is called after Setup Intent saves a card, or when using an existing saved card
    */
   purchaseSeats: async (data: PurchaseSeatsRequest): Promise<ProcessPaymentResponse> => {
-    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats/purchase', data);
+    const response = await apiClient.post<ProcessPaymentResponse>('/payments/seats/confirm-purchase', data);
     return response.data;
   },
 
@@ -159,10 +164,156 @@ export const paymentService = {
   },
 
   /**
+   * Create Stripe checkout session for seat purchase
+   */
+  createStripeCheckout: async (data: PurchaseSeatsRequest): Promise<{ success: boolean; message: string; data: { checkout_url: string } }> => {
+    const response = await apiClient.post('/subscriptions/seats/stripe-checkout', data);
+    return response.data;
+  },
+
+  /**
+   * Create payment intent for seat purchase (returns client_secret)
+   */
+  createPaymentIntent: async (data: Omit<PurchaseSeatsRequest, 'payment_method_id'>): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      client_secret: string;
+      payment_intent_id: string;
+      amount: number;
+    };
+  }> => {
+    const response = await apiClient.post('/payments/seats/payment-intent', data);
+    return response.data;
+  },
+
+  /**
+   * Confirm purchase after successful Stripe payment
+   */
+  confirmPurchase: async (data: {
+    payment_intent_id: string;
+    batch_name?: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: any;
+  }> => {
+    const response = await apiClient.post('/payments/seats/confirm-purchase', data);
+    return response.data;
+  },
+
+  /**
+   * Get Stripe setup intent client secret
+   * Note: Publishable key is loaded from environment variable (VITE_STRIPE_PK)
+   * This endpoint only returns the client_secret for Setup Intent
+   */
+  getStripePublishableKey: async (): Promise<{ 
+    success: boolean; 
+    statusCode: number;
+    message: string;
+    data: { 
+      client_secret: string;
+    };
+    metadata: any;
+    timestamp: string;
+  }> => {
+    const response = await apiClient.get('/payments/stripe/get_secret');
+    return response.data;
+  },
+
+  /**
+   * Get Stripe setup intent client secret for adding payment methods
+   * Note: Publishable key is loaded from environment variable (VITE_STRIPE_PK)
+   * This endpoint only returns the client_secret for Setup Intent
+   */
+  getStripeSetupSecret: async (): Promise<{ 
+    success: boolean;
+    statusCode: number;
+    message: string;
+    data: { 
+      client_secret: string;
+    };
+    metadata: any;
+    timestamp: string;
+  }> => {
+    const response = await apiClient.get('/payments/stripe/get_secret');
+    return response.data;
+  },
+
+  /**
    * Process payment (for seat purchase or extension)
    */
   processPayment: async (data: ProcessPaymentRequest): Promise<ProcessPaymentResponse> => {
     const response = await apiClient.post<ProcessPaymentResponse>('/payments/process', data);
+    return response.data;
+  },
+
+  /**
+   * Get transaction history with pagination and filters
+   */
+  getTransactions: async (params?: {
+    page?: number;
+    limit?: number;
+    transaction_type?: 'debit' | 'credit';
+    start_date?: string;
+    end_date?: string;
+  }): Promise<{ success: boolean; message: string; data: TransactionsResponse }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.transaction_type) queryParams.append('transaction_type', params.transaction_type);
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+
+    const response = await apiClient.get(`/transactions${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+    return response.data;
+  },
+
+  /**
+   * Get single transaction details
+   */
+  getTransaction: async (transactionId: string): Promise<{ success: boolean; message: string; data: Transaction }> => {
+    const response = await apiClient.get(`/transactions/${transactionId}`);
+    return response.data;
+  },
+
+  /**
+   * Add payment method
+   */
+  addPaymentMethod: async (data: { payment_method_id: string }): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post('/payments/payment-methods', data);
+    return response.data;
+  },
+
+  /**
+   * Delete payment method
+   */
+  deletePaymentMethod: async (paymentMethodId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.delete(`/payments/payment-methods/${paymentMethodId}`);
+    return response.data;
+  },
+
+  /**
+   * Set default payment method
+   */
+  setDefaultPaymentMethod: async (paymentMethodId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.patch(`/payments/payment-methods/${paymentMethodId}/set-default`);
+    return response.data;
+  },
+
+  /**
+   * Get billing address
+   */
+  getBillingAddress: async (): Promise<{ success: boolean; data: BillingAddress }> => {
+    const response = await apiClient.get('/payments/billing-address');
+    return response.data;
+  },
+
+  /**
+   * Update billing address
+   */
+  updateBillingAddress: async (data: BillingAddress): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.put('/payments/billing-address', data);
     return response.data;
   },
 };

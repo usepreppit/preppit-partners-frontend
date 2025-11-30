@@ -1,5 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { CloseIcon } from '../../icons';
+import Button from '../ui/button/Button';
+import { paymentService } from '../../services/payment.service';
+
+/**
+ * Stripe Setup Intent Flow for Adding Payment Methods:
+ * 
+ * 1. User clicks "Add Card"
+ * 2. Frontend initializes Stripe with publishable key from environment
+ * 3. Frontend calls GET /payments/stripe/get_secret to get client_secret
+ * 4. Backend creates a SetupIntent and returns client_secret
+ * 5. Frontend renders Stripe PaymentElement with client_secret
+ * 6. User enters card details (handled securely by Stripe)
+ * 7. Frontend calls stripe.confirmSetup() with the client_secret
+ * 8. Stripe validates and attaches the payment method to the customer
+ * 9. Frontend refreshes payment methods list
+ * 
+ * Note: Card details never touch our servers (PCI-DSS compliant)
+ */
+
+// Initialize Stripe with publishable key from environment
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PK;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 interface AddPaymentMethodModalProps {
   isOpen: boolean;
@@ -7,26 +31,111 @@ interface AddPaymentMethodModalProps {
   onAdd: (data: any) => void;
 }
 
+function AddPaymentMethodForm({ onSuccess, onError }: { onSuccess: () => void; onError: (msg: string) => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error, setupIntent } = await stripe.confirmSetup({
+        elements,
+        redirect: 'if_required',
+        confirmParams: {
+          return_url: window.location.origin + '/billing?setup=success',
+        },
+      });
+
+      if (error) {
+        onError(error.message || 'Failed to add payment method');
+        setLoading(false);
+        return;
+      }
+
+      if (setupIntent && setupIntent.status === 'succeeded' && setupIntent.payment_method) {
+        // Payment method was successfully attached
+        onSuccess();
+      }
+    } catch (err: any) {
+      onError(err.message || 'Failed to add payment method');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <div className="p-4 border border-gray-200 dark:border-gray-800 rounded-lg">
+        <PaymentElement />
+      </div>
+
+      <div className="flex items-center justify-end gap-3 pt-4">
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={!stripe || loading}
+          className="w-full"
+        >
+          {loading ? 'Adding Card...' : 'Add Payment Method'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export default function AddPaymentMethodModal({
   isOpen,
   onClose,
   onAdd,
 }: AddPaymentMethodModalProps) {
-  const [formData, setFormData] = useState({
-    cardholder_name: '',
-    card_number: '',
-    expiry_month: '',
-    expiry_year: '',
-    cvv: '',
-  });
+  const [clientSecret, setClientSecret] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAdd({
-      ...formData,
-      expiry_month: parseInt(formData.expiry_month),
-      expiry_year: parseInt(formData.expiry_year),
-    });
+  useEffect(() => {
+    const initializeStripe = async () => {
+      if (!isOpen) return;
+
+      setIsLoading(true);
+      setError('');
+
+      try {
+        // Stripe Setup Intent Flow:
+        // Get setup intent client secret from backend
+        const secretResponse = await paymentService.getStripeSetupSecret();
+        
+        if (secretResponse.success && secretResponse.data.client_secret) {
+          setClientSecret(secretResponse.data.client_secret);
+        } else {
+          setError('Failed to initialize payment form');
+        }
+      } catch (err) {
+        console.error('Failed to initialize Stripe:', err);
+        setError('Failed to load payment form. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeStripe();
+  }, [isOpen]);
+
+  const handleSuccess = () => {
+    onAdd({ success: true });
+    onClose();
+  };
+
+  const handleError = (message: string) => {
+    setError(message);
   };
 
   if (!isOpen) return null;
@@ -52,100 +161,32 @@ export default function AddPaymentMethodModal({
             </button>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Cardholder Name
-              </label>
-              <input
-                type="text"
-                value={formData.cardholder_name}
-                onChange={(e) => setFormData({ ...formData, cardholder_name: e.target.value })}
-                className="input"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Card Number
-              </label>
-              <input
-                type="text"
-                value={formData.card_number}
-                onChange={(e) => setFormData({ ...formData, card_number: e.target.value })}
-                className="input"
-                placeholder="1234 5678 9012 3456"
-                maxLength={19}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Month
-                </label>
-                <input
-                  type="number"
-                  value={formData.expiry_month}
-                  onChange={(e) => setFormData({ ...formData, expiry_month: e.target.value })}
-                  className="input"
-                  placeholder="MM"
-                  min="1"
-                  max="12"
-                  required
-                />
+          {/* Content */}
+          {isLoading ? (
+            <div className="p-6">
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Year
-                </label>
-                <input
-                  type="number"
-                  value={formData.expiry_year}
-                  onChange={(e) => setFormData({ ...formData, expiry_year: e.target.value })}
-                  className="input"
-                  placeholder="YYYY"
-                  min="2025"
-                  max="2040"
-                  required
-                />
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                Loading payment form...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="p-6">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  CVV
-                </label>
-                <input
-                  type="text"
-                  value={formData.cvv}
-                  onChange={(e) => setFormData({ ...formData, cvv: e.target.value })}
-                  className="input"
-                  placeholder="123"
-                  maxLength={4}
-                  required
-                />
+              <div className="flex items-center justify-end gap-3 pt-4">
+                <Button onClick={onClose} variant="outline" size="md">
+                  Close
+                </Button>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary">
-                Add Card
-              </button>
-            </div>
-          </form>
+          ) : clientSecret && stripePromise ? (
+            <Elements stripe={stripePromise} options={{ clientSecret }}>
+              <AddPaymentMethodForm onSuccess={handleSuccess} onError={handleError} />
+            </Elements>
+          ) : null}
         </div>
       </div>
     </>

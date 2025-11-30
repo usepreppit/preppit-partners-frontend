@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 import { CloseIcon, DollarLineIcon } from '../../icons';
 import Button from '../ui/button/Button';
 import { paymentService, PaymentMethod } from '../../services/payment.service';
+import StripePaymentForm from './StripePaymentForm';
+
+/**
+ * Stripe Payment Flow (as per Stripe documentation):
+ * 1. Initialize Stripe with publishable key from environment
+ * 2. Create payment intent on backend (returns client_secret)
+ * 3. Use client_secret with Stripe Elements to collect payment
+ * 4. Confirm payment with Stripe
+ * 5. Confirm purchase on backend after successful payment
+ */
+
+// Initialize Stripe with publishable key from environment
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PK;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 interface PaymentPromptModalProps {
   isOpen: boolean;
@@ -26,11 +42,17 @@ export default function PaymentPromptModal({
   onSkip,
 }: PaymentPromptModalProps) {
   const [newBatchName, setNewBatchName] = useState(batchName);
-  const [selectedMonths, setSelectedMonths] = useState(1);
+  const [selectedMonths, setSelectedMonths] = useState(1); // Default: 1 month
   const [selectedSeats, setSelectedSeats] = useState(minSeats);
-  const [selectedSessionsPerDay, setSelectedSessionsPerDay] = useState(3);
+  const [selectedSessionsPerDay, setSelectedSessionsPerDay] = useState(5); // Default: 5 sessions per day
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [autoRenew, setAutoRenew] = useState(false);
+  const [isProcessingStripe, setIsProcessingStripe] = useState(false);
+  
+  // Stripe payment intent state
+  const [clientSecret, setClientSecret] = useState<string>('');
+  const [paymentIntentId, setPaymentIntentId] = useState<string>('');
+  const [showStripeForm, setShowStripeForm] = useState(false);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -56,8 +78,16 @@ export default function PaymentPromptModal({
   useEffect(() => {
     if (isOpen) {
       setNewBatchName(batchName);
+      // Reset to default values when modal opens
+      setSelectedMonths(1);
+      setSelectedSessionsPerDay(5);
+      setSelectedSeats(Math.max(minSeats, 10));
+      setAutoRenew(false);
+      setShowStripeForm(false);
+      setClientSecret('');
+      setPaymentIntentId('');
     }
-  }, [isOpen, batchName]);
+  }, [isOpen, batchName, minSeats]);
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
@@ -71,6 +101,8 @@ export default function PaymentPromptModal({
     queryKey: ['pricing', selectedSeats, selectedSessionsPerDay, selectedMonths],
     queryFn: () => paymentService.getPricing(selectedSeats, selectedSessionsPerDay, selectedMonths),
     enabled: isOpen && selectedSeats >= minSeats,
+    refetchOnMount: true,
+    staleTime: 0, // Always fetch fresh pricing
   });
 
   // Purchase seats mutation
@@ -100,9 +132,9 @@ export default function PaymentPromptModal({
     }
   }, [paymentMethodsData]);
 
-  const handlePayment = () => {
-    if (!selectedPaymentMethod || !pricingData) {
-      alert('Please select a payment method');
+  const handlePayment = async () => {
+    if (!pricingData) {
+      alert('Please wait for pricing to load');
       return;
     }
 
@@ -120,7 +152,6 @@ export default function PaymentPromptModal({
       seat_count: selectedSeats,
       sessions_per_day: selectedSessionsPerDay,
       months: selectedMonths,
-      payment_method_id: selectedPaymentMethod,
       auto_renew: autoRenew,
     };
 
@@ -131,13 +162,49 @@ export default function PaymentPromptModal({
       requestData.batch_id = batchId;
     }
 
-    purchaseSeatsMutation.mutate(requestData);
+    // If no payment methods available, get Setup Intent to collect and save card details
+    if (paymentMethods.length === 0) {
+      setIsProcessingStripe(true);
+      
+      try {
+        // Step 1: Get Setup Intent client secret to collect card details
+        console.log('Getting Setup Intent client secret...');
+        const secretResponse = await paymentService.getStripeSetupSecret();
+        
+        if (!secretResponse.success || !secretResponse.data.client_secret) {
+          throw new Error('Failed to get Setup Intent secret');
+        }
+        
+        console.log('Setup Intent client secret received');
+        // Set the client secret to show Stripe form for collecting card details
+        setClientSecret(secretResponse.data.client_secret);
+        setShowStripeForm(true);
+        setIsProcessingStripe(false);
+        
+        // Store the request data for later use after card is saved
+        // We'll process the payment after the card is saved
+        (window as any).__pendingPaymentData = requestData;
+      } catch (error) {
+        console.error('Failed to get Setup Intent secret:', error);
+        setIsProcessingStripe(false);
+        alert('Failed to initialize payment form. Please try again.');
+      }
+    } else {
+      // Use saved payment method
+      if (!selectedPaymentMethod) {
+        alert('Please select a payment method');
+        return;
+      }
+      requestData.payment_method_id = selectedPaymentMethod;
+      purchaseSeatsMutation.mutate(requestData);
+    }
   };
 
   if (!isOpen) return null;
 
   const paymentMethods = paymentMethodsData?.data?.payment_methods || [];
-  const isProcessing = purchaseSeatsMutation.isPending;
+  const isProcessing = purchaseSeatsMutation.isPending || isProcessingStripe;
+  const hasPaymentMethods = paymentMethods.length > 0;
 
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center">
@@ -175,26 +242,64 @@ export default function PaymentPromptModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Batch Name - Only for new batches */}
-          {isNewBatch && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Batch Name *
-              </label>
-              <input
-                type="text"
-                value={newBatchName}
-                onChange={(e) => setNewBatchName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                placeholder="Enter batch name (e.g., 'Fall 2025 Cohort')"
-                required
-              />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Choose a descriptive name for this batch
+        {showStripeForm && clientSecret ? (
+          // Stripe Payment Form
+          stripePromise ? (
+            <div className="p-6">
+              <Elements stripe={stripePromise} options={{ clientSecret }}>
+                <StripePaymentForm
+                  paymentIntentId={paymentIntentId}
+                  batchName={isNewBatch ? newBatchName : batchName}
+                  mode={paymentMethods.length === 0 ? 'setup' : 'payment'}
+                  pendingPaymentData={(window as any).__pendingPaymentData}
+                  onSuccess={() => {
+                    // Clear pending payment data
+                    delete (window as any).__pendingPaymentData;
+                    if (onPaymentComplete) onPaymentComplete();
+                    onClose();
+                  }}
+                  onError={(message) => {
+                    alert(message || 'Payment failed. Please try again.');
+                    setShowStripeForm(false);
+                    setClientSecret('');
+                    setPaymentIntentId('');
+                    delete (window as any).__pendingPaymentData;
+                  }}
+                />
+              </Elements>
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                Initializing Stripe...
               </p>
             </div>
-          )}
+          )
+        ) : (
+          // Configuration Form
+          <div className="p-6 space-y-6">
+            {/* Batch Name - Only for new batches */}
+            {isNewBatch && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Batch Name *
+                </label>
+                <input
+                  type="text"
+                  value={newBatchName}
+                  onChange={(e) => setNewBatchName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  placeholder="Enter batch name (e.g., 'Fall 2025 Cohort')"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Choose a descriptive name for this batch
+                </p>
+              </div>
+            )}
 
           {/* Number of Seats */}
           <div>
@@ -231,14 +336,22 @@ export default function PaymentPromptModal({
                   onClick={() => setSelectedSessionsPerDay(option.value)}
                   className={`px-4 py-3 rounded-lg border-2 transition-all ${
                     selectedSessionsPerDay === option.value
-                      ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-500'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
                   }`}
                 >
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <div className={`text-sm font-semibold ${
+                    selectedSessionsPerDay === option.value
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
                     {option.value === -1 ? '∞' : option.value}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <div className={`text-xs mt-0.5 ${
+                    selectedSessionsPerDay === option.value
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>
                     {option.value === -1 ? 'unlimited' : 'per day'}
                   </div>
                 </button>
@@ -262,12 +375,20 @@ export default function PaymentPromptModal({
                   onClick={() => setSelectedMonths(months)}
                   className={`px-4 py-3 rounded-lg border-2 transition-all ${
                     selectedMonths === months
-                      ? 'border-primary-600 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-500'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
                   }`}
                 >
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">{months}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <div className={`text-sm font-semibold ${
+                    selectedMonths === months
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-900 dark:text-white'
+                  }`}>{months}</div>
+                  <div className={`text-xs mt-0.5 ${
+                    selectedMonths === months
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>
                     {months === 1 ? 'month' : 'months'}
                   </div>
                 </button>
@@ -315,22 +436,30 @@ export default function PaymentPromptModal({
               </h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>{pricingData.data.seats} seat{pricingData.data.seats > 1 ? 's' : ''} × ${pricingData.data.breakdown?.price_per_seat?.toFixed(2) || '0.00'}</span>
-                  <span>${(pricingData.data.seats * (pricingData.data.breakdown?.price_per_seat || 0)).toFixed(2)}</span>
+                  <span>Seats</span>
+                  <span>{pricingData.data.breakdown.seat_count}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
-                  <span></span>
+                  <span>Sessions Per Day</span>
+                  <span>{pricingData.data.breakdown.sessions_per_day === -1 ? 'Unlimited' : pricingData.data.breakdown.sessions_per_day}</span>
                 </div>
-                {pricingData.data.breakdown?.discount > 0 && (
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                  <span>Duration</span>
+                  <span>{pricingData.data.breakdown.months} month{pricingData.data.breakdown.months > 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                  <span>Price per Candidate</span>
+                  <span>${pricingData.data.per_candidate.toFixed(2)}</span>
+                </div>
+                {pricingData.data.breakdown.volume_discount > 0 && (
                   <div className="flex justify-between text-green-600 dark:text-green-400">
-                    <span>Discount</span>
-                    <span>-${pricingData.data.breakdown.discount.toFixed(2)}</span>
+                    <span>Volume Discount</span>
+                    <span>{pricingData.data.breakdown.volume_discount}%</span>
                   </div>
                 )}
                 <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
                   <span>Total</span>
-                  <span>${pricingData.data.amount?.toFixed(2) || '0.00'}</span>
+                  <span>${pricingData.data.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -342,9 +471,15 @@ export default function PaymentPromptModal({
               Payment Method
             </label>
             {paymentMethods.length === 0 ? (
-              <div className="text-center py-8 border border-gray-200 dark:border-gray-800 rounded-lg">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  No payment methods available. Please add a payment method first.
+              <div className="text-center py-8 border-2 border-dashed border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/10 rounded-lg">
+                <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center mx-auto mb-3">
+                  <DollarLineIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                </div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  No saved payment methods
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  You'll be redirected to secure Stripe checkout to add a card and complete payment
                 </p>
               </div>
             ) : (
@@ -388,28 +523,43 @@ export default function PaymentPromptModal({
               </div>
             )}
           </div>
-        </div>
+          </div>
+        )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
-          <Button
-            onClick={onSkip || onClose}
-            variant="outline"
-            size="md"
-            className="flex-1"
-          >
-            {onSkip ? 'Skip Payment' : 'Cancel'}
-          </Button>
-          <Button
-            onClick={handlePayment}
-            variant="primary"
-            size="md"
-            className="flex-1"
-            disabled={!selectedPaymentMethod || isPricingLoading || isProcessing || selectedSeats < minSeats}
-          >
-            {isProcessing ? 'Processing...' : `Pay $${pricingData?.data?.amount?.toFixed(2) || '0.00'}`}
-          </Button>
-        </div>
+        {/* Footer - Only show for configuration form, not for Stripe form */}
+        {!showStripeForm && (
+          <div className="flex items-center justify-between gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
+            <Button
+              onClick={onSkip || onClose}
+              variant="outline"
+              size="md"
+              className="flex-1"
+            >
+              {onSkip ? 'Skip Payment' : 'Cancel'}
+            </Button>
+            <Button
+              onClick={handlePayment}
+              variant="primary"
+              size="md"
+              className="flex-1"
+              disabled={
+                (hasPaymentMethods && !selectedPaymentMethod) || 
+                isPricingLoading || 
+                isProcessing || 
+                selectedSeats < minSeats
+              }
+            >
+              {isPricingLoading
+                ? 'Loading...'
+                : isProcessing 
+                  ? (isProcessingStripe ? 'Redirecting to Payment...' : 'Processing...') 
+                  : hasPaymentMethods 
+                    ? `Pay $${pricingData?.data?.total?.toFixed(2) || '0.00'}` 
+                    : `Continue to Payment ($${pricingData?.data?.total?.toFixed(2) || '0.00'})`
+              }
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

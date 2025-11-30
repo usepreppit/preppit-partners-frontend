@@ -1,4 +1,5 @@
 import apiClient from './api/apiClient';
+import type { ApiResponse, SeatSubscription, SeatSubscriptionsResponse } from '../types/api.types';
 
 // Types
 export interface Batch {
@@ -133,6 +134,26 @@ export const candidatesService = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  /**
+   * Get all seat subscriptions with summary
+   */
+  getSeatSubscriptions: async (): Promise<ApiResponse<SeatSubscriptionsResponse>> => {
+    const response = await apiClient.get<ApiResponse<SeatSubscriptionsResponse>>(
+      '/subscriptions/seats'
+    );
+    return response.data;
+  },
+
+  /**
+   * Get a single seat subscription by ID
+   */
+  getSeatSubscription: async (seatId: string): Promise<ApiResponse<SeatSubscription>> => {
+    const response = await apiClient.get<ApiResponse<SeatSubscription>>(
+      `/subscriptions/seats/${seatId}`
+    );
     return response.data;
   },
 };
