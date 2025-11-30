@@ -4,6 +4,8 @@ import Label from "../form/Label";
 
 export default function OtpForm() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputsRef = useRef<HTMLInputElement[]>([]);
 
   const handleChange = (value: string, index: number) => {
@@ -68,8 +70,31 @@ export default function OtpForm() {
     }
   };
 
-  const handleSubmit = () => {
-    alert(`Submitted OTP: ${otp.join("")}`);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const otpValue = otp.join("");
+    
+    // Validate OTP
+    if (otpValue.length !== 6) {
+      setError("Please enter all 6 digits");
+      return;
+    }
+    
+    setError("");
+    setIsSubmitting(true);
+    
+    try {
+      // TODO: Replace with actual OTP verification API call
+      console.log(`Submitted OTP: ${otpValue}`);
+      // await verifyOtp(otpValue);
+      
+      // On success, navigate or show success message
+    } catch (err) {
+      setError("Invalid verification code. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <div className="flex flex-col flex-1 w-full lg:w-1/2">
@@ -108,7 +133,12 @@ export default function OtpForm() {
           </p>
         </div>
         <div>
-          <form>
+          <form onSubmit={handleSubmit}>
+            {error && (
+              <div className="mb-5 p-4 text-sm text-red-800 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
+                {error}
+              </div>
+            )}
             <div className="space-y-5">
               {/* <!-- Email --> */}
               <div>
@@ -138,10 +168,11 @@ export default function OtpForm() {
               {/* <!-- Button --> */}
               <div>
                 <button
-                  onClick={handleSubmit}
-                  className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white transition rounded-lg bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Verify My Account
+                  {isSubmitting ? "Verifying..." : "Verify My Account"}
                 </button>
               </div>
             </div>

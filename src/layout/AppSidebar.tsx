@@ -20,9 +20,7 @@ import {
   UserCircleIcon,
   UserIcon,
   FileIcon,
-  DollarLineIcon,
   BoxIcon,
-  InfoIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
@@ -53,19 +51,9 @@ const partnerNavItems: NavItem[] = [
     path: "/exams",
   },
   {
-    icon: <DollarLineIcon />,
-    name: "Finances",
-    path: "/finances",
-  },
-  {
     icon: <BoxIcon />,
     name: "Billing",
     path: "/billing",
-  },
-  {
-    icon: <BoxIcon />,
-    name: "Subscriptions",
-    path: "/subscriptions",
   },
   {
     icon: <PieChartIcon />,
@@ -74,17 +62,7 @@ const partnerNavItems: NavItem[] = [
   },
 ];
 
-const partnerSupportItems: NavItem[] = [
-  {
-    icon: <InfoIcon />,
-    name: "Support",
-    path: "/support",
-  },
-  {
-    icon: <ChatIcon />,
-    name: "Chat",
-    path: "/chat",
-  },
+const partnerAccountItems: NavItem[] = [
   {
     icon: <UserCircleIcon />,
     name: "Profile",
@@ -255,7 +233,7 @@ const AppSidebar: React.FC = () => {
   // Determine which navigation items to use based on user account type
   const isPartner = user?.account_type === 'partner';
   const currentNavItems = isPartner ? partnerNavItems : navItems;
-  const currentSupportItems = isPartner ? partnerSupportItems : supportItems;
+  const currentAccountItems = isPartner ? partnerAccountItems : supportItems;
 
   // const isActive = (path: string) => location.pathname === path;
   const isActive = useCallback(
@@ -270,7 +248,7 @@ const AppSidebar: React.FC = () => {
         menuType === "main"
           ? currentNavItems
           : menuType === "support"
-          ? currentSupportItems
+          ? currentAccountItems
           : othersItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
@@ -290,7 +268,7 @@ const AppSidebar: React.FC = () => {
     if (!submenuMatched) {
       setOpenSubmenu(null);
     }
-  }, [location, isActive, currentNavItems, currentSupportItems]);
+  }, [location, isActive, currentNavItems, currentAccountItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -522,12 +500,12 @@ const AppSidebar: React.FC = () => {
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Support"
+                  isPartner ? "Account" : "Support"
                 ) : (
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(currentSupportItems, "support")}
+              {renderMenuItems(currentAccountItems, "support")}
             </div>
             {!isPartner && (
               <div className="">

@@ -8,10 +8,13 @@ import { useEffect, useState } from "react";
 import PartnerOnboardingModal from "../components/common/PartnerOnboardingModal";
 import { useCompleteOnboarding } from "../hooks/useOnboarding";
 import { PartnerProfile } from "../types/auth.types";
+import { FeedbackProvider, useFeedback } from "../context/FeedbackContext";
+import FeedbackModal from "../components/modals/FeedbackModal";
 
 const LayoutContent: React.FC = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const { user } = useAuthContext();
+  const { isOpen: isFeedbackOpen, closeFeedback } = useFeedback();
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const completeOnboardingMutation = useCompleteOnboarding();
 
@@ -58,6 +61,9 @@ const LayoutContent: React.FC = () => {
           onComplete={handleOnboardingComplete}
         />
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={closeFeedback} />
     </div>
   );
 };
@@ -65,7 +71,9 @@ const LayoutContent: React.FC = () => {
 const AppLayout: React.FC = () => {
   return (
     <SidebarProvider>
-      <LayoutContent />
+      <FeedbackProvider>
+        <LayoutContent />
+      </FeedbackProvider>
     </SidebarProvider>
   );
 };

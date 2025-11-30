@@ -15,20 +15,23 @@ export default function SignUpForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [validationError, setValidationError] = useState("");
   
   const registerMutation = useRegister();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
+    // Clear previous validation errors
+    setValidationError("");
+    
     if (password !== confirmPassword) {
-      // You can add a notification here
-      alert("Passwords do not match");
+      setValidationError("Passwords do not match");
       return;
     }
 
     if (!isChecked) {
-      alert("You must agree to the Terms and Conditions");
+      setValidationError("You must agree to the Terms and Conditions");
       return;
     }
     
@@ -42,6 +45,9 @@ export default function SignUpForm() {
   };
 
   const getErrorMessage = () => {
+    if (validationError) {
+      return validationError;
+    }
     if (registerMutation.error) {
       const error = registerMutation.error as unknown as ApiErrorResponse;
       return error.details?.message || error.message || "An error occurred during registration";
@@ -72,7 +78,7 @@ export default function SignUpForm() {
           </div>
           <div>
             <form onSubmit={handleSubmit}>
-              {registerMutation.error && (
+              {(registerMutation.error || validationError) && (
                 <div className="p-4 mb-6 text-sm text-red-800 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
                   {getErrorMessage()}
                 </div>

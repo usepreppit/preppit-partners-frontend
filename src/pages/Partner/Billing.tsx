@@ -133,21 +133,22 @@ export default function Billing() {
     );
   }
 
-  const seats = seatsData?.data?.seats || [];
-  const candidatesWithoutPlan = seatsData?.data?.total_candidates_without_plan || 0;
-  const paymentMethods = paymentMethodsData?.data?.payment_methods || [];
+  const seats = seatsData?.data?.subscriptions || [];
+  const candidatesWithoutPlan = (seatsData?.data?.total_candidates || 0) - (seatsData?.data?.total_seats_assigned || 0);
+  const paymentMethods = paymentMethodsData?.data?.cards || [];
+  const defaultPaymentMethod = paymentMethodsData?.data?.default_payment_method || null;
   const billingAddress = sampleBillingAddress;
   const transactions = transactionsData?.data?.transactions || [];
   const totalPages = transactionsData?.data?.total_pages || 1;
 
   return (
     <>
-      <PageMeta title="Billing and Subscriptions" description="Manage your subscriptions, billing, and payments" />
+      <PageMeta title="Billing & Subscriptions" description="Manage your subscriptions, billing, and payments" />
       
       {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-          Billing and Subscriptions
+          Billing & Subscriptions
         </h1>
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Manage your seat subscriptions, billing address, and payment methods
@@ -169,7 +170,7 @@ export default function Billing() {
                 </p>
                 <Button
                   onClick={() => {
-                    setSelectedBatchForPurchase({ id: '', name: 'New Batch' });
+                    setSelectedBatchForPurchase({ id: '', name: '' });
                     setIsCreateSeatModalOpen(true);
                   }}
                   variant="primary"
@@ -194,7 +195,7 @@ export default function Billing() {
             </div>
             <Button
               onClick={() => {
-                setSelectedBatchForPurchase({ id: '', name: 'New Batch' });
+                setSelectedBatchForPurchase({ id: '', name: '' });
                 setIsCreateSeatModalOpen(true);
               }}
               variant="primary"
@@ -213,7 +214,7 @@ export default function Billing() {
               </p>
               <Button
                 onClick={() => {
-                  setSelectedBatchForPurchase({ id: '', name: 'New Batch' });
+                  setSelectedBatchForPurchase({ id: '', name: '' });
                   setIsCreateSeatModalOpen(true);
                 }}
                 variant="primary"
@@ -227,7 +228,7 @@ export default function Billing() {
             <div className="space-y-3">
               {seats.map((seat) => (
                 <div
-                  key={seat.id}
+                  key={seat._id}
                   className={`p-4 rounded-lg border transition-all ${
                     seat.is_active
                       ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/10'
@@ -263,7 +264,7 @@ export default function Billing() {
                         <div>
                           <p className="text-gray-500 dark:text-gray-400 text-xs">Available</p>
                           <p className="font-semibold text-gray-900 dark:text-white">
-                            {seat.seat_count - seat.seats_assigned}
+                            {seat.seats_available}
                           </p>
                         </div>
                         <div>
@@ -278,7 +279,7 @@ export default function Billing() {
                         <span>Started: {new Date(seat.start_date).toLocaleDateString()}</span>
                         <span>•</span>
                         <span>Ends: {new Date(seat.end_date).toLocaleDateString()}</span>
-                        {seat.auto_renew && (
+                        {seat.auto_renew_interval_days > 0 && (
                           <>
                             <span>•</span>
                             <span className="text-primary-600 dark:text-primary-400 font-medium">Auto-renew enabled</span>
@@ -317,10 +318,107 @@ export default function Billing() {
           )}
         </div>
 
-        {/* Billing Address and Payment Methods - Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Billing Address */}
-          <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-5">
+        {/* Payment Methods and Billing Address */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Payment Methods - 2/3 width */}
+          <div className="lg:col-span-2 rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 dark:text-white">Payment Methods</h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Manage your saved payment cards
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsAddPaymentModalOpen(true)}
+                variant="outline"
+                size="sm"
+                startIcon={<PlusIcon className="w-3.5 h-3.5 fill-current" />}
+              >
+                Add Card
+              </Button>
+            </div>
+
+            {paymentMethods.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                <p className="text-sm text-gray-500 dark:text-gray-400">No payment methods added yet</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Add a payment method to make purchases
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-5 px-5">
+                <div className="flex gap-4 pb-2">
+                  {paymentMethods.map((method) => (
+                    <div
+                      key={method.id}
+                      className="flex-shrink-0 w-64 p-4 rounded-xl border-2 transition-all relative bg-gradient-to-br from-gray-800 to-gray-900 dark:from-gray-900 dark:to-black border-gray-700 text-white"
+                    >
+                      {/* Card Header */}
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="text-xs font-medium opacity-80">
+                          {method.card.funding === 'credit' ? 'Credit Card' : method.card.funding === 'debit' ? 'Debit Card' : 'Card'}
+                        </div>
+                        {defaultPaymentMethod === method.id && (
+                          <span className="px-2 py-0.5 text-xs font-semibold bg-primary-500 text-white rounded">
+                            Default
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Card Number */}
+                      <div className="mb-6">
+                        <div className="font-mono text-lg tracking-wider">
+                          •••• •••• •••• {method.card.last4}
+                        </div>
+                      </div>
+
+                      {/* Card Details */}
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <div className="text-xs opacity-60 mb-1">Expires</div>
+                          <div className="font-mono text-sm">
+                            {String(method.card.exp_month).padStart(2, '0')}/{String(method.card.exp_year).toString().slice(-2)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold uppercase tracking-wide">
+                            {method.card.brand}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Actions */}
+                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-700">
+                        {defaultPaymentMethod !== method.id && (
+                          <Button
+                            onClick={() => handleSetDefault(method.id)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-xs bg-white/10 border-white/20 text-white hover:bg-white/20"
+                            disabled={setDefaultMutation.isPending}
+                          >
+                            Set Default
+                          </Button>
+                        )}
+                        <button
+                          onClick={() => handleDeletePayment(method.id)}
+                          className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                          disabled={deletePaymentMutation.isPending}
+                          title="Delete card"
+                        >
+                          <TrashBinIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Billing Address - 1/3 width */}
+          <div className="lg:col-span-1 rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-5">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <h2 className="text-base font-bold text-gray-900 dark:text-white">Billing Address</h2>
@@ -347,79 +445,6 @@ export default function Billing() {
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">No billing address set</p>
             )}
-          </div>
-
-          {/* Payment Methods */}
-          <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] p-5">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">Payment Methods</h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Manage your saved payment cards
-                </p>
-              </div>
-              <Button
-                onClick={() => setIsAddPaymentModalOpen(true)}
-                variant="outline"
-                size="sm"
-                startIcon={<PlusIcon className="w-3.5 h-3.5 fill-current" />}
-              >
-                Add Card
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {paymentMethods.length === 0 ? (
-                <div className="text-center py-6 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">No payment methods added yet</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Add a payment method to make purchases
-                  </p>
-                </div>
-              ) : (
-                paymentMethods.map((method) => (
-                  <div
-                    key={method.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                          {method.card_brand} •••• {method.last_four}
-                        </p>
-                        {method.is_default && (
-                          <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400 rounded">
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Expires {String(method.expiry_month).padStart(2, '0')}/{String(method.expiry_year).slice(-2)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!method.is_default && (
-                        <Button
-                          onClick={() => handleSetDefault(method.id)}
-                          variant="outline"
-                          size="sm"
-                          disabled={setDefaultMutation.isPending}
-                        >
-                          Set Default
-                        </Button>
-                      )}
-                      <button
-                        onClick={() => handleDeletePayment(method.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        disabled={deletePaymentMutation.isPending}
-                      >
-                        <TrashBinIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </div>
 

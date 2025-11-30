@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
-import { CloseIcon, DollarLineIcon } from '../../icons';
+import { CloseIcon } from '../../icons';
 import Button from '../ui/button/Button';
 import { paymentService, PaymentMethod } from '../../services/payment.service';
 import StripePaymentForm from './StripePaymentForm';
@@ -120,14 +120,12 @@ export default function PaymentPromptModal({
 
   // Set default payment method when data loads
   useEffect(() => {
-    if (paymentMethodsData?.data?.payment_methods) {
-      const defaultMethod = paymentMethodsData.data.payment_methods.find(
-        (method: PaymentMethod) => method.is_default
-      );
-      if (defaultMethod) {
-        setSelectedPaymentMethod(defaultMethod.id);
-      } else if (paymentMethodsData.data.payment_methods.length > 0) {
-        setSelectedPaymentMethod(paymentMethodsData.data.payment_methods[0].id);
+    if (paymentMethodsData?.data?.cards) {
+      const defaultMethodId = paymentMethodsData.data.default_payment_method;
+      if (defaultMethodId) {
+        setSelectedPaymentMethod(defaultMethodId);
+      } else if (paymentMethodsData.data.cards.length > 0) {
+        setSelectedPaymentMethod(paymentMethodsData.data.cards[0].id);
       }
     }
   }, [paymentMethodsData]);
@@ -202,7 +200,8 @@ export default function PaymentPromptModal({
 
   if (!isOpen) return null;
 
-  const paymentMethods = paymentMethodsData?.data?.payment_methods || [];
+  const paymentMethods = paymentMethodsData?.data?.cards || [];
+  const defaultPaymentMethodId = paymentMethodsData?.data?.default_payment_method || null;
   const isProcessing = purchaseSeatsMutation.isPending || isProcessingStripe;
   const hasPaymentMethods = paymentMethods.length > 0;
 
@@ -218,18 +217,13 @@ export default function PaymentPromptModal({
       <div className="relative z-[100001] w-full max-w-2xl mx-4 bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-              <DollarLineIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                 {isNewBatch ? 'Create New Batch with Seats' : `Purchase Seats for ${batchName || 'Batch'}`}
               </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isNewBatch ? 'Set up a new batch with subscription' : `Add ${selectedSeats} seat${selectedSeats > 1 ? 's' : ''} to this batch`}
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {isNewBatch ? 'Set up a new batch with subscription' : `Add ${selectedSeats} seat${selectedSeats > 1 ? 's' : ''} to this batch`}
+            </p>
           </div>
           {!onSkip && (
             <button
@@ -472,9 +466,6 @@ export default function PaymentPromptModal({
             </label>
             {paymentMethods.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/10 rounded-lg">
-                <div className="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center mx-auto mb-3">
-                  <DollarLineIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
-                </div>
                 <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
                   No saved payment methods
                 </p>
@@ -505,16 +496,16 @@ export default function PaymentPromptModal({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {method.card_brand}
+                            {method.card.brand.toUpperCase()}
                           </span>
-                          {method.is_default && (
+                          {defaultPaymentMethodId === method.id && (
                             <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400 rounded">
                               Default
                             </span>
                           )}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          **** **** **** {method.last_four} • Exp {String(method.expiry_month).padStart(2, '0')}/{String(method.expiry_year).slice(-2)}
+                          **** **** **** {method.card.last4} • Exp {String(method.card.exp_month).padStart(2, '0')}/{String(method.card.exp_year).toString().slice(-2)}
                         </div>
                       </div>
                     </div>
