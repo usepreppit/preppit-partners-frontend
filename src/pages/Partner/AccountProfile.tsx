@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../hooks/useAuth';
 import { useModal } from '../../hooks/useModal';
 import { Modal } from '../../components/ui/modal';
@@ -6,27 +7,38 @@ import Button from '../../components/ui/button/Button';
 import Input from '../../components/form/input/InputField';
 import Label from '../../components/form/Label';
 import { PencilIcon } from '../../icons';
+import { authService } from '../../services/auth.service';
 
 export default function AccountProfile() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { isOpen, openModal, closeModal } = useModal();
   const [formData, setFormData] = useState({
-    firstName: user?.firstname || '',
-    lastName: user?.lastname || '',
+    firstname: user?.firstname || '',
+    lastname: user?.lastname || '',
     email: user?.email || '',
-    phone: user?.contact_phone || '',
-    organization: user?.organization_name || '',
-    contactPerson: user?.contact_person_name || '',
-    contactEmail: user?.contact_email || '',
-    country: user?.country || '',
-    timezone: user?.timezone || '',
-    currency: user?.preferred_currency || 'USD',
+    phone_number: user?.partnerProfile?.contact_phone || '',
+    organization_name: user?.partnerProfile?.organization_name || '',
+    contact_person_name: user?.partnerProfile?.contact_person_name || '',
+    contact_email: user?.partnerProfile?.contact_email || '',
+    contact_phone: user?.partnerProfile?.contact_phone || '',
+    country: user?.partnerProfile?.country || '',
+    timezone: user?.partnerProfile?.timezone || '',
+    preferred_currency: user?.partnerProfile?.preferred_currency || 'USD',
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: typeof formData) => {
+      const { email, ...updateData } = data; // Remove email from update
+      return authService.updateProfile(updateData);
+    },
+    onSuccess: () => {
+      refreshUser();
+      closeModal();
+    },
   });
 
   const handleSave = () => {
-    console.log('Saving profile changes...', formData);
-    // TODO: Implement API call to update profile
-    closeModal();
+    updateProfileMutation.mutate(formData);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,7 +114,7 @@ export default function AccountProfile() {
                 Phone Number
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.contact_phone || 'Not provided'}
+                {user?.partnerProfile?.contact_phone || 'Not provided'}
               </p>
             </div>
 
@@ -111,7 +123,7 @@ export default function AccountProfile() {
                 Organization
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.organization_name || 'Not provided'}
+                {user?.partnerProfile?.organization_name || 'Not provided'}
               </p>
             </div>
 
@@ -120,7 +132,7 @@ export default function AccountProfile() {
                 Contact Person
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.contact_person_name || 'Not provided'}
+                {user?.partnerProfile?.contact_person_name || 'Not provided'}
               </p>
             </div>
 
@@ -129,7 +141,7 @@ export default function AccountProfile() {
                 Contact Email
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.contact_email || 'Not provided'}
+                {user?.partnerProfile?.contact_email || 'Not provided'}
               </p>
             </div>
 
@@ -138,7 +150,7 @@ export default function AccountProfile() {
                 Country
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.country || 'Not provided'}
+                {user?.partnerProfile?.country || 'Not provided'}
               </p>
             </div>
 
@@ -147,7 +159,7 @@ export default function AccountProfile() {
                 Timezone
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.timezone || 'Not provided'}
+                {user?.partnerProfile?.timezone || 'Not provided'}
               </p>
             </div>
 
@@ -156,7 +168,7 @@ export default function AccountProfile() {
                 Preferred Currency
               </p>
               <p className="text-sm font-medium text-gray-800 dark:text-white">
-                {user?.preferred_currency || 'USD'}
+                {user?.partnerProfile?.preferred_currency || 'USD'}
               </p>
             </div>
           </div>
@@ -176,21 +188,21 @@ export default function AccountProfile() {
           <div className="space-y-4 mb-6">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstname">First Name</Label>
                 <Input
-                  id="firstName"
-                  name="firstName"
-                  value={formData.firstName}
+                  id="firstname"
+                  name="firstname"
+                  value={formData.firstname}
                   onChange={handleInputChange}
                   placeholder="Enter first name"
                 />
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastname">Last Name</Label>
                 <Input
-                  id="lastName"
-                  name="lastName"
-                  value={formData.lastName}
+                  id="lastname"
+                  name="lastname"
+                  value={formData.lastname}
                   onChange={handleInputChange}
                   placeholder="Enter last name"
                 />
@@ -215,12 +227,12 @@ export default function AccountProfile() {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone_number">Phone Number</Label>
                 <Input
-                  id="phone"
-                  name="phone"
+                  id="phone_number"
+                  name="phone_number"
                   type="tel"
-                  value={formData.phone}
+                  value={formData.phone_number}
                   onChange={handleInputChange}
                   placeholder="Enter phone number"
                 />
@@ -238,11 +250,11 @@ export default function AccountProfile() {
             </div>
 
             <div>
-              <Label htmlFor="organization">Organization Name</Label>
+              <Label htmlFor="organization_name">Organization Name</Label>
               <Input
-                id="organization"
-                name="organization"
-                value={formData.organization}
+                id="organization_name"
+                name="organization_name"
+                value={formData.organization_name}
                 onChange={handleInputChange}
                 placeholder="Enter organization name"
               />
@@ -250,22 +262,22 @@ export default function AccountProfile() {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
-                <Label htmlFor="contactPerson">Contact Person</Label>
+                <Label htmlFor="contact_person_name">Contact Person</Label>
                 <Input
-                  id="contactPerson"
-                  name="contactPerson"
-                  value={formData.contactPerson}
+                  id="contact_person_name"
+                  name="contact_person_name"
+                  value={formData.contact_person_name}
                   onChange={handleInputChange}
                   placeholder="Enter contact person name"
                 />
               </div>
               <div>
-                <Label htmlFor="contactEmail">Contact Email</Label>
+                <Label htmlFor="contact_email">Contact Email</Label>
                 <Input
-                  id="contactEmail"
-                  name="contactEmail"
+                  id="contact_email"
+                  name="contact_email"
                   type="email"
-                  value={formData.contactEmail}
+                  value={formData.contact_email}
                   onChange={handleInputChange}
                   placeholder="Enter contact email"
                 />
@@ -274,34 +286,46 @@ export default function AccountProfile() {
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div>
+                <Label htmlFor="contact_phone">Contact Phone</Label>
+                <Input
+                  id="contact_phone"
+                  name="contact_phone"
+                  type="tel"
+                  value={formData.contact_phone}
+                  onChange={handleInputChange}
+                  placeholder="Enter contact phone"
+                />
+              </div>
+              <div>
                 <Label htmlFor="timezone">Timezone</Label>
                 <Input
                   id="timezone"
                   name="timezone"
                   value={formData.timezone}
                   onChange={handleInputChange}
-                  placeholder="e.g., Africa/Lagos"
+                  placeholder="e.g., America/New_York"
                 />
               </div>
-              <div>
-                <Label htmlFor="currency">Preferred Currency</Label>
-                <Input
-                  id="currency"
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleInputChange}
-                  placeholder="e.g., USD"
-                />
-              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="preferred_currency">Preferred Currency</Label>
+              <Input
+                id="preferred_currency"
+                name="preferred_currency"
+                value={formData.preferred_currency}
+                onChange={handleInputChange}
+                placeholder="e.g., USD"
+              />
             </div>
           </div>
 
           <div className="flex gap-3 justify-end">
-            <Button onClick={closeModal} variant="outline">
+            <Button onClick={closeModal} variant="outline" disabled={updateProfileMutation.isPending}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              Save Changes
+            <Button onClick={handleSave} disabled={updateProfileMutation.isPending}>
+              {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </div>

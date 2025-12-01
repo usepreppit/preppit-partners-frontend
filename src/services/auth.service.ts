@@ -8,6 +8,7 @@ import {
   ResetPasswordResponse,
   ChangePasswordRequest,
   UpdatePasswordRequest,
+  UpdateProfileRequest,
   User,
 } from '../types/auth.types';
 import { ApiResponse } from '../types/api.types';
@@ -100,6 +101,13 @@ export const authService = {
    * Change password for authenticated user
    */
   changePassword: async (data: UpdatePasswordRequest): Promise<ApiResponse<{ message: string }>> => {
-    return apiService.post<ApiResponse<{ message: string }>>('/auth/change-password', data);
+    return apiService.post<ApiResponse<{ message: string }>>('/profile/change_password', data);
+  },
+
+  /**
+   * Update user profile
+   */
+  updateProfile: async (data: UpdateProfileRequest): Promise<ApiResponse<User>> => {
+    return apiService.put<ApiResponse<User>>('/profile/update_profile', data);
   },
 };

@@ -73,9 +73,22 @@ export interface ChangePasswordRequest {
 }
 
 export interface UpdatePasswordRequest {
-  current_password: string;
+  old_password: string;
   new_password: string;
-  confirm_password: string;
+  confirm_new_password: string;
+}
+
+export interface UpdateProfileRequest {
+  firstname: string;
+  lastname: string;
+  phone_number: string;
+  country: string;
+  organization_name: string;
+  contact_person_name: string;
+  contact_email: string;
+  contact_phone: string;
+  timezone: string;
+  preferred_currency: string;
 }
 
 export interface ApiError {

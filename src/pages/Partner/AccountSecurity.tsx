@@ -57,9 +57,9 @@ export default function AccountSecurity() {
       setIsLoading(true);
       try {
         const response = await authService.changePassword({
-          current_password: passwordForm.currentPassword,
+          old_password: passwordForm.currentPassword,
           new_password: passwordForm.newPassword,
-          confirm_password: passwordForm.confirmPassword,
+          confirm_new_password: passwordForm.confirmPassword,
         });
         
         // Reset form after successful change
