@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "../../styles/datepicker-custom.css";
@@ -72,14 +72,27 @@ export default function Candidates() {
   const handleAssignToBatch = async () => {
     if (!selectedBatchForAssignment || selectedCandidates.size === 0) return;
     
-    // TODO: Call API to assign candidates to batch
-    // await candidatesService.assignCandidatesToBatch(Array.from(selectedCandidates), selectedBatchForAssignment);
-    
-    setSelectedCandidates(new Set());
-    setIsAssignBatchModalOpen(false);
-    setSelectedBatchForAssignment("");
-    refetch();
+    try {
+      await assignMutation.mutateAsync({
+        candidateIds: Array.from(selectedCandidates),
+        batchId: selectedBatchForAssignment,
+      });
+    } catch (error) {
+      console.error('Failed to assign candidates to batch:', error);
+    }
   };
+
+  // Mutation for assigning candidates to batch
+  const assignMutation = useMutation({
+    mutationFn: ({ candidateIds, batchId }: { candidateIds: string[], batchId: string }) =>
+      candidatesService.assignCandidatesToBatch(candidateIds, batchId),
+    onSuccess: () => {
+      setSelectedCandidates(new Set());
+      setIsAssignBatchModalOpen(false);
+      setSelectedBatchForAssignment("");
+      refetch();
+    },
+  });
 
   // Check if any selected candidates already have a batch
   const selectedCandidatesWithBatches = Array.from(selectedCandidates)
@@ -707,9 +720,9 @@ export default function Candidates() {
                       variant="primary"
                       size="md"
                       onClick={handleAssignToBatch}
-                      disabled={!selectedBatchForAssignment}
+                      disabled={!selectedBatchForAssignment || assignMutation.isPending}
                     >
-                      Assign to Batch
+                      {assignMutation.isPending ? 'Assigning...' : 'Assign to Batch'}
                     </Button>
                   </div>
                 </div>

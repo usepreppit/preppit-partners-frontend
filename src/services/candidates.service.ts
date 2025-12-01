@@ -141,6 +141,20 @@ export const candidatesService = {
   },
 
   /**
+   * Assign candidates to a batch
+   */
+  assignCandidatesToBatch: async (candidateIds: string[], batchId: string): Promise<ApiResponse<{ updated: number }>> => {
+    const response = await apiClient.post<ApiResponse<{ updated: number }>>(
+      '/candidates/assign-to-batch',
+      {
+        batch_id: batchId,
+        candidate_ids: candidateIds,
+      }
+    );
+    return response.data;
+  },
+
+  /**
    * Get all seat subscriptions with summary
    */
   getSeatSubscriptions: async (): Promise<ApiResponse<SeatSubscriptionsResponse>> => {
