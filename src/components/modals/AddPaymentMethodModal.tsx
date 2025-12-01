@@ -61,8 +61,17 @@ function AddPaymentMethodForm({ onSuccess, onError }: { onSuccess: () => void; o
       }
 
       if (setupIntent && setupIntent.status === 'succeeded' && setupIntent.payment_method) {
-        // Payment method was successfully attached
-        onSuccess();
+        // Save payment method to backend
+        try {
+          const paymentMethodId = typeof setupIntent.payment_method === 'string' 
+            ? setupIntent.payment_method 
+            : setupIntent.payment_method.id;
+          
+          await paymentService.savePaymentMethod(paymentMethodId);
+          onSuccess();
+        } catch (saveError: any) {
+          onError(saveError.response?.data?.message || 'Failed to save payment method');
+        }
       }
     } catch (err: any) {
       onError(err.message || 'Failed to add payment method');

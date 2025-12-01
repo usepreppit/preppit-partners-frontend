@@ -334,6 +334,21 @@ export const getDefaultDashboardData = (): DashboardResponse => {
         ],
       },
     },
-    nextSteps: [],
+    nextSteps: [
+      {
+        id: 'add-candidates',
+        title: 'Add Your First Candidates',
+        description: 'Start by adding candidates to your partner account',
+        completed: false,
+        link: '/candidates',
+      },
+      {
+        id: 'setup-payment',
+        title: 'Setup Payment Method',
+        description: 'Add a payment method to manage billing and subscriptions',
+        completed: false,
+        link: '/billing',
+      },
+    ],
   };
 };

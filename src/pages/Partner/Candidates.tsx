@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -11,6 +10,7 @@ import CandidateDetailsModal from "../../components/modals/CandidateDetailsModal
 import { candidatesService, Candidate } from "../../services/candidates.service";
 import { PlusIcon, DownloadIcon, ListIcon, UserIcon, EnvelopeIcon } from "../../icons";
 import { useAuth } from "../../hooks/useAuth";
+import { Modal } from "../../components/ui/modal";
 
 export default function Candidates() {
   const { user } = useAuth();
@@ -23,6 +23,9 @@ export default function Candidates() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set());
+  const [isAssignBatchModalOpen, setIsAssignBatchModalOpen] = useState(false);
+  const [selectedBatchForAssignment, setSelectedBatchForAssignment] = useState<string>("");
   const itemsPerPage = 20;
 
   // Check if onboarding is completed
@@ -47,6 +50,44 @@ export default function Candidates() {
   const pagination = candidatesData?.data?.pagination;
   const totalCandidates = candidatesData?.data?.total_candidates || 0;
 
+  // Handlers for selection
+  const toggleCandidateSelection = (candidateId: string) => {
+    const newSelection = new Set(selectedCandidates);
+    if (newSelection.has(candidateId)) {
+      newSelection.delete(candidateId);
+    } else {
+      newSelection.add(candidateId);
+    }
+    setSelectedCandidates(newSelection);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedCandidates.size === paginatedCandidates.length && paginatedCandidates.length > 0) {
+      setSelectedCandidates(new Set());
+    } else {
+      setSelectedCandidates(new Set(paginatedCandidates.map(c => c._id)));
+    }
+  };
+
+  const handleAssignToBatch = async () => {
+    if (!selectedBatchForAssignment || selectedCandidates.size === 0) return;
+    
+    // TODO: Call API to assign candidates to batch
+    // await candidatesService.assignCandidatesToBatch(Array.from(selectedCandidates), selectedBatchForAssignment);
+    
+    setSelectedCandidates(new Set());
+    setIsAssignBatchModalOpen(false);
+    setSelectedBatchForAssignment("");
+    refetch();
+  };
+
+  // Check if any selected candidates already have a batch
+  const selectedCandidatesWithBatches = Array.from(selectedCandidates)
+    .map(id => candidates.find(c => c._id === id))
+    .filter(c => c && c.batch_name);
+  
+  const canAssignToBatch = selectedCandidates.size > 0 && selectedCandidatesWithBatches.length === 0;
+
   // Calculate analytics
   const today = new Date();
   const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
@@ -70,7 +111,9 @@ export default function Candidates() {
     const matchesStatus = 
       statusFilter === "all" || 
       (statusFilter === "active" && candidate.is_active) || 
-      (statusFilter === "inactive" && !candidate.is_active);
+      (statusFilter === "inactive" && !candidate.is_active) ||
+      (statusFilter === "paid" && candidate.is_paid_for) ||
+      (statusFilter === "unpaid" && !candidate.is_paid_for);
     
     const matchesBatch = batchFilter === "all" || candidate.batch_name === batchFilter;
 
@@ -238,10 +281,12 @@ export default function Candidates() {
           </div>
         </div>
 
-        {/* Search and Filters Card */}
-        <div className="card">
-          <div className="card-body">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Candidates Table */}
+        <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          {/* Filter Tabs and Actions */}
+          <div className="p-5 border-b border-gray-200 dark:border-gray-800">
+            {/* Search and Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
               {/* Search */}
               <div className="lg:col-span-2">
                 <div className="relative">
@@ -263,8 +308,8 @@ export default function Candidates() {
                 </div>
               </div>
 
-              {/* Status Filter */}
-              <div>
+              {/* Status Filter - Hidden as it's in tabs */}
+              <div className="hidden">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
@@ -293,7 +338,7 @@ export default function Candidates() {
                 </select>
               </div>
 
-              {/* Date Range Picker - Single Element */}
+              {/* Date Range Picker */}
               <div>
                 <DatePicker
                   selectsRange={true}
@@ -308,118 +353,208 @@ export default function Candidates() {
                   isClearable
                 />
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Candidates Table */}
-        <div className="card bg-white dark:bg-gray-900">
-          <div className="card-body p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full bg-white dark:bg-gray-900">
-                <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+              {/* Assign Button */}
+              <div className="flex flex-col gap-2">
+                {selectedCandidates.size > 0 && (
+                  <>
+                    <Button
+                      size="md"
+                      variant="primary"
+                      onClick={() => setIsAssignBatchModalOpen(true)}
+                      disabled={!canAssignToBatch}
+                      className="w-full"
+                    >
+                      Assign {selectedCandidates.size} to Batch
+                    </Button>
+                    {!canAssignToBatch && selectedCandidatesWithBatches.length > 0 && (
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        Only candidates without batches can be assigned
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Tabs with pill style */}
+            <nav className="flex overflow-x-auto rounded-lg bg-gray-100 p-1 dark:bg-gray-900 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-white dark:[&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-200 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out whitespace-nowrap ${
+                  statusFilter === 'all'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-white/[0.03] dark:text-white'
+                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                All Candidates
+              </button>
+              <button
+                onClick={() => setStatusFilter('active')}
+                className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out whitespace-nowrap ${
+                  statusFilter === 'active'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-white/[0.03] dark:text-white'
+                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setStatusFilter('inactive')}
+                className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out whitespace-nowrap ${
+                  statusFilter === 'inactive'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-white/[0.03] dark:text-white'
+                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Inactive
+              </button>
+              <button
+                onClick={() => setStatusFilter('paid')}
+                className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out whitespace-nowrap ${
+                  statusFilter === 'paid'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-white/[0.03] dark:text-white'
+                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Paid
+              </button>
+              <button
+                onClick={() => setStatusFilter('unpaid')}
+                className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium transition-colors duration-200 ease-in-out whitespace-nowrap ${
+                  statusFilter === 'unpaid'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-white/[0.03] dark:text-white'
+                    : 'bg-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                }`}
+              >
+                Unpaid
+              </button>
+            </nav>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b border-gray-100 dark:border-white/[0.05]">
+                <tr>
+                  <th className="px-5 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedCandidates.size === paginatedCandidates.length && paginatedCandidates.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                    />
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Candidate
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Contact
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Batch
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Invite Date
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Invite Status
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Status
+                  </th>
+                  <th className="px-5 py-3 text-sm font-medium text-left text-gray-700 dark:text-gray-400">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                {paginatedCandidates.length === 0 ? (
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Candidate
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Contact
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Batch
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Invite Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Invite Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <td colSpan={8} className="px-6 py-12 text-center">
+                      <div className="text-gray-500 dark:text-gray-400">
+                        <ListIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p className="text-lg font-medium">No candidates found</p>
+                        <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                  {paginatedCandidates.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <div className="text-gray-500 dark:text-gray-400">
-                          <ListIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                          <p className="text-lg font-medium">No candidates found</p>
-                          <p className="text-sm mt-1">Try adjusting your search or filters</p>
+                ) : (
+                  paginatedCandidates.map((candidate) => (
+                    <tr 
+                      key={candidate._id} 
+                      className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                    >
+                      <td className="px-5 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedCandidates.has(candidate._id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleCandidateSelection(candidate._id);
+                          }}
+                          className="rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
+                        />
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                            <span className="text-primary-700 dark:text-primary-400 font-medium text-sm">
+                              {candidate.firstname[0]}{candidate.lastname[0]}
+                            </span>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {candidate.firstname} {candidate.lastname}
+                          </div>
                         </div>
                       </td>
+                      <td className="px-5 py-3.5">
+                        <div className="text-sm text-gray-900 dark:text-white">{candidate.email}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {candidate.is_paid_for ? 'Paid' : 'Unpaid'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {candidate.batch_name || 'NA'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {new Date(candidate.invite_sent_at).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getInviteStatusBadge(candidate.invite_status)}`}>
+                          {candidate.invite_status.charAt(0).toUpperCase() + candidate.invite_status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${candidate.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
+                          {candidate.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCandidate(candidate);
+                            setIsDetailsModalOpen(true);
+                          }}
+                          className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300 text-sm font-medium"
+                        >
+                          View
+                        </button>
+                      </td>
                     </tr>
-                  ) : (
-                    paginatedCandidates.map((candidate) => (
-                      <tr 
-                        key={candidate._id} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
-                        onClick={() => {
-                          setSelectedCandidate(candidate);
-                          setIsDetailsModalOpen(true);
-                        }}
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10">
-                              <div className="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                                <span className="text-primary-700 dark:text-primary-400 font-medium">
-                                  {candidate.firstname[0]}{candidate.lastname[0]}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {candidate.firstname} {candidate.lastname}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{candidate.email}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {candidate.is_paid_for ? 'Paid' : 'Unpaid'}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">{candidate.batch_name}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {new Date(candidate.invite_sent_at).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getInviteStatusBadge(candidate.invite_status)}`}>
-                            {candidate.invite_status.charAt(0).toUpperCase() + candidate.invite_status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${candidate.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
-                            {candidate.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <Link
-                            to={`/candidates/${candidate._id}`}
-                            className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
-                          >
-                            View Details
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-            {/* Pagination */}
-            {filteredCandidates.length > 0 && (
+          {/* Pagination */}
+          {filteredCandidates.length > 0 && (
               <div className="bg-white dark:bg-gray-900 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-700 dark:text-gray-400">
@@ -461,7 +596,6 @@ export default function Candidates() {
                 </div>
               </div>
             )}
-          </div>
         </div>
         </>
         )}
@@ -476,6 +610,114 @@ export default function Candidates() {
         }}
         candidate={selectedCandidate}
       />
+
+      {/* Assign to Batch Modal */}
+      {isAssignBatchModalOpen && (
+        <div className="fixed inset-0 z-[99999] overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 bg-black/50 transition-opacity z-[99999]"
+              onClick={() => {
+                setIsAssignBatchModalOpen(false);
+                setSelectedBatchForAssignment("");
+              }}
+            />
+
+            {/* Modal */}
+            <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-xl shadow-xl z-[100000]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Assign to Batch
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {selectedCandidates.size} candidate{selectedCandidates.size !== 1 ? 's' : ''} selected
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsAssignBatchModalOpen(false);
+                    setSelectedBatchForAssignment("");
+                  }}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6">
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Select a batch to assign the selected candidate{selectedCandidates.size !== 1 ? 's' : ''} to. They will be moved to the chosen batch.
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Batch *
+                    </label>
+                    <select
+                      value={selectedBatchForAssignment}
+                      onChange={(e) => setSelectedBatchForAssignment(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Choose a batch...</option>
+                      {apiBatches.map((batch) => (
+                        <option key={batch._id} value={batch._id}>
+                          {batch.batch_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Info Box */}
+                  {selectedBatchForAssignment && (
+                    <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-800 dark:text-blue-200">
+                        The selected candidates will be moved to this batch and will receive batch-specific communications.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="md"
+                      onClick={() => {
+                        setIsAssignBatchModalOpen(false);
+                        setSelectedBatchForAssignment("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="primary"
+                      size="md"
+                      onClick={handleAssignToBatch}
+                      disabled={!selectedBatchForAssignment}
+                    >
+                      Assign to Batch
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

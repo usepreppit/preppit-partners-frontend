@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { CloseIcon, MailIcon } from '../../icons';
 import Button from '../ui/button/Button';
+import { utilsService } from '../../services/utils.service';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -10,27 +12,29 @@ interface FeedbackModalProps {
 export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const { mutate: submitFeedback, isPending } = useMutation({
+    mutationFn: (data: { subject: string; message: string }) =>
+      utilsService.submitFeedback(data),
+    onSuccess: () => {
+      setSuccessMessage('Thank you for your feedback!');
+      setSubject('');
+      setMessage('');
+      setTimeout(() => {
+        setSuccessMessage('');
+        onClose();
+      }, 2000);
+    },
+    onError: (error: any) => {
+      console.error('Failed to submit feedback:', error);
+      alert(error?.response?.data?.message || 'Failed to submit feedback. Please try again.');
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    // Create mailto link with subject and body
-    const mailtoLink = `mailto:support@usepreppit.com?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(message)}`;
-
-    // Open mail client
-    window.location.href = mailtoLink;
-
-    // Reset form and close modal after a short delay
-    setTimeout(() => {
-      setSubject('');
-      setMessage('');
-      setIsSubmitting(false);
-      onClose();
-    }, 500);
+    submitFeedback({ subject, message });
   };
 
   if (!isOpen) return null;
@@ -107,12 +111,19 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
             </div>
 
             {/* Info Message */}
-            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                Your default email client will open with your feedback. You can review and send it
-                from there.
-              </p>
-            </div>
+            {successMessage ? (
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <p className="text-sm text-green-800 dark:text-green-200 font-medium">
+                  {successMessage}
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-xs text-blue-800 dark:text-blue-200">
+                  Your feedback will be sent to our team for review. We appreciate your input!
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -120,7 +131,8 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              disabled={isPending}
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -128,9 +140,9 @@ export default function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               type="submit"
               variant="primary"
               size="md"
-              disabled={isSubmitting || !subject.trim() || !message.trim()}
+              disabled={isPending || !subject.trim() || !message.trim()}
             >
-              {isSubmitting ? 'Opening...' : 'Send Feedback'}
+              {isPending ? 'Sending...' : 'Send Feedback'}
             </Button>
           </div>
         </form>

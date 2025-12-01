@@ -104,7 +104,8 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
 
   // Upload CSV mutation
   const uploadCsvMutation = useMutation({
-    mutationFn: candidatesService.uploadCandidatesCsv,
+    mutationFn: ({ file, batchId }: { file: File; batchId?: string }) => 
+      candidatesService.uploadCandidatesCsv(file, batchId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['seat-subscriptions'] }); // Refresh subscriptions data
@@ -150,7 +151,10 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   const handleCsvUpload = (e: React.FormEvent) => {
     e.preventDefault();
     if (csvFile) {
-      uploadCsvMutation.mutate(csvFile);
+      uploadCsvMutation.mutate({ 
+        file: csvFile, 
+        batchId: selectedBatchForCsv || undefined 
+      });
     }
   };
 
@@ -269,16 +273,15 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Batch *
+                    Batch (Optional)
                   </label>
                   <select
-                    required
                     value={candidateForm.batch_id}
                     onChange={(e) => setCandidateForm({ ...candidateForm, batch_id: e.target.value })}
                     disabled={subscriptionsLoading}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   >
-                    <option value="">Select batch</option>
+                    <option value="">No batch (Unpaid candidate)</option>
                     {batchesWithSeats.map((batch) => (
                       <option key={batch._id} value={batch._id}>
                         {batch.batch_name} ({batch.availableSeats} of {batch.totalSeats} seats available)
@@ -287,7 +290,11 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                   </select>
                   {batchesWithSeats.length === 0 && !subscriptionsLoading && (
                     <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
-                      No batches available. Please create a batch with seats from the Billing page.
+                      No batches available.{' '}
+                      <a href="/subscriptions" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                        Create a batch from the subscriptions page
+                      </a>
+                      .
                     </p>
                   )}
                 </div>
@@ -324,7 +331,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
               <form onSubmit={handleCsvUpload} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Select Batch *
+                    Select Batch (Optional)
                   </label>
                   <Select
                     value={batchesWithSeats.find(b => b._id === selectedBatchForCsv) ? {
@@ -332,10 +339,13 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                       label: `${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.batch_name} (${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.availableSeats} of ${batchesWithSeats.find(b => b._id === selectedBatchForCsv)?.totalSeats} seats available)`
                     } : null}
                     onChange={(option) => setSelectedBatchForCsv(option?.value || "")}
-                    options={batchesWithSeats.map(batch => ({
-                      value: batch._id,
-                      label: `${batch.batch_name} (${batch.availableSeats} of ${batch.totalSeats} seats available)`
-                    }))}
+                    options={[
+                      { value: "", label: "No batch (Unpaid candidates)" },
+                      ...batchesWithSeats.map(batch => ({
+                        value: batch._id,
+                        label: `${batch.batch_name} (${batch.availableSeats} of ${batch.totalSeats} seats available)`
+                      }))
+                    ]}
                     placeholder="Search or select batch..."
                     isClearable
                     isLoading={subscriptionsLoading}

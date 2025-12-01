@@ -1,4 +1,5 @@
 import { UserIcon, CheckCircleIcon, ShootingStarIcon } from '../../icons';
+import { Link } from 'react-router';
 
 interface KeyMetricsCardProps {
   totalCandidates: number;
@@ -36,7 +37,10 @@ export default function KeyMetricsCard({
       <div className="card-body">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Candidates */}
-          <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">
+          <Link 
+            to="/candidates"
+            className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 hover:border-blue-300 dark:hover:border-blue-700 transition-colors cursor-pointer"
+          >
             <div className="flex-shrink-0 w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
               <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
@@ -51,7 +55,7 @@ export default function KeyMetricsCard({
                 </p>
               )}
             </div>
-          </div>
+          </Link>
 
           {/* Completed Sessions */}
           <div className="flex items-start gap-4 p-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50">

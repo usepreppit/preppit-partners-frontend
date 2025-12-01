@@ -46,14 +46,14 @@ const partnerNavItems: NavItem[] = [
     path: "/candidates",
   },
   {
+    icon: <BoxIcon />,
+    name: "Subscriptions",
+    path: "/billing",
+  },
+  {
     icon: <FileIcon />,
     name: "Exams",
     path: "/exams",
-  },
-  {
-    icon: <BoxIcon />,
-    name: "Billing",
-    path: "/billing",
   },
   {
     icon: <PieChartIcon />,
@@ -65,8 +65,8 @@ const partnerNavItems: NavItem[] = [
 const partnerAccountItems: NavItem[] = [
   {
     icon: <UserCircleIcon />,
-    name: "Profile",
-    path: "/profile",
+    name: "Account",
+    path: "/account",
   },
 ];
 

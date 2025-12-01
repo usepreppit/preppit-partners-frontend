@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
 import Ecommerce from "./pages/Dashboard/Ecommerce";
 import Stocks from "./pages/Dashboard/Stocks";
 import Crm from "./pages/Dashboard/Crm";
@@ -11,6 +11,11 @@ import Subscriptions from "./pages/Partner/Subscriptions";
 import Support from "./pages/Partner/Support";
 import Billing from "./pages/Partner/Billing";
 import Analytics from "./pages/Partner/Analytics";
+import Account from "./pages/Partner/Account";
+import AccountProfile from "./pages/Partner/AccountProfile";
+import AccountSecurity from "./pages/Partner/AccountSecurity";
+import AccountPayments from "./pages/Partner/AccountPayments";
+import AccountIntegrations from "./pages/Partner/AccountIntegrations";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import VerifyEmail from "./pages/AuthPages/VerifyEmail";
@@ -91,12 +96,22 @@ export default function App() {
               <Route index path="/" element={<Ecommerce />} />
               <Route path="/partner-dashboard" element={<PartnerDashboard />} />
               <Route path="/candidates" element={<Candidates />} />
+              <Route path="/billing" element={<Subscriptions />} />
+              <Route path="/subscriptions" element={<Billing />} />
               <Route path="/exams" element={<Exams />} />
               <Route path="/finances" element={<Finances />} />
-              <Route path="/billing" element={<Billing />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/support" element={<Support />} />
               <Route path="/analytics" element={<Analytics />} />
+              
+              {/* Account Settings with nested routes */}
+              <Route path="/account" element={<Account />}>
+                <Route index element={<Navigate to="/account/profile" replace />} />
+                <Route path="profile" element={<AccountProfile />} />
+                <Route path="security" element={<AccountSecurity />} />
+                <Route path="payments" element={<AccountPayments />} />
+                <Route path="integrations" element={<AccountIntegrations />} />
+              </Route>
+              
               <Route path="/marketing" element={<Marketing />} />
               <Route path="/crm" element={<Crm />} />
               <Route path="/stocks" element={<Stocks />} />

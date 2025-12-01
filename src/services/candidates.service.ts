@@ -56,7 +56,7 @@ export interface CreateCandidateData {
   firstname: string;
   lastname: string;
   email: string;
-  batch_id: string;
+  batch_id?: string;
 }
 
 export interface CreateBatchData {
@@ -125,9 +125,12 @@ export const candidatesService = {
   /**
    * Upload candidates via CSV
    */
-  uploadCandidatesCsv: async (file: File): Promise<UploadCsvResponse> => {
+  uploadCandidatesCsv: async (file: File, batchId?: string): Promise<UploadCsvResponse> => {
     const formData = new FormData();
     formData.append('file', file);
+    if (batchId) {
+      formData.append('batch_id', batchId);
+    }
 
     const response = await apiClient.post<UploadCsvResponse>('/candidates/upload-csv', formData, {
       headers: {

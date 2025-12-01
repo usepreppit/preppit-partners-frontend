@@ -17,6 +17,9 @@ export const useCompleteOnboarding = () => {
       
       // Invalidate current user query to ensure fresh data
       queryClient.invalidateQueries({ queryKey: authKeys.currentUser });
+      
+      // Redirect to candidates page after successful onboarding
+      window.location.href = '/candidates';
     },
   });
 };

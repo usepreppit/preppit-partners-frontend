@@ -339,6 +339,16 @@ export const paymentService = {
   },
 
   /**
+   * Save payment method after Stripe Setup Intent
+   */
+  savePaymentMethod: async (paymentMethodId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post('/payments/payment-methods/save', {
+      payment_method: paymentMethodId
+    });
+    return response.data;
+  },
+
+  /**
    * Add payment method
    */
   addPaymentMethod: async (data: { payment_method_id: string }): Promise<{ success: boolean; message: string }> => {
@@ -358,7 +368,9 @@ export const paymentService = {
    * Set default payment method
    */
   setDefaultPaymentMethod: async (paymentMethodId: string): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.patch(`/payments/payment-methods/${paymentMethodId}/set-default`);
+    const response = await apiClient.post('/payments/payment-methods/default', {
+      payment_method_id: paymentMethodId
+    });
     return response.data;
   },
 

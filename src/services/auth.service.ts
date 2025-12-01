@@ -7,6 +7,7 @@ import {
   ResetPasswordRequest,
   ResetPasswordResponse,
   ChangePasswordRequest,
+  UpdatePasswordRequest,
   User,
 } from '../types/auth.types';
 import { ApiResponse } from '../types/api.types';
@@ -93,5 +94,12 @@ export const authService = {
     return apiService.get<ApiResponse<{ message: string }>>(
       `/auth/verify_email?email=${encodeURIComponent(email)}&verify_token=${encodeURIComponent(verifyToken)}`
     );
+  },
+
+  /**
+   * Change password for authenticated user
+   */
+  changePassword: async (data: UpdatePasswordRequest): Promise<ApiResponse<{ message: string }>> => {
+    return apiService.post<ApiResponse<{ message: string }>>('/auth/change-password', data);
   },
 };
