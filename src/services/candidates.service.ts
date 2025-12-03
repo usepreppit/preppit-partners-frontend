@@ -76,14 +76,25 @@ export interface CandidateResponse {
   data: Candidate;
 }
 
+export interface CsvUploadError {
+  row: number;
+  email: string;
+  error: string;
+}
+
 export interface UploadCsvResponse {
   success: boolean;
+  statusCode: number;
   message: string;
   data: {
-    uploaded: number;
+    total_rows: number;
+    successful: number;
     failed: number;
-    errors?: string[];
+    errors?: CsvUploadError[];
+    candidates: Candidate[];
   };
+  metadata: Record<string, unknown>;
+  timestamp: string;
 }
 
 // Service Functions

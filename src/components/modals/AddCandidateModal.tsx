@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Select from 'react-select';
 import { candidatesService, CreateCandidateData } from "../../services/candidates.service";
-import { CloseIcon, DownloadIcon } from "../../icons";
+import { CloseIcon, DownloadIcon, ChevronDownIcon } from "../../icons";
 import Button from "../ui/button/Button";
 import PaymentPromptModal from "./PaymentPromptModal";
 import { useEffect } from "react";
@@ -26,6 +26,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   const [mode, setMode] = useState<ModalMode>('single');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [selectedBatchForCsv, setSelectedBatchForCsv] = useState<string>("");
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
   
   // Payment prompt state (only when batch is full)
   const [showPaymentStep, setShowPaymentStep] = useState(false);
@@ -106,14 +107,16 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
   const uploadCsvMutation = useMutation({
     mutationFn: ({ file, batchId }: { file: File; batchId?: string }) => 
       candidatesService.uploadCandidatesCsv(file, batchId),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['candidates'] });
       queryClient.invalidateQueries({ queryKey: ['seat-subscriptions'] }); // Refresh subscriptions data
       
-      // Close modal and reset forms
-      resetForms();
-      onClose();
-      onSuccess?.();
+      // Don't auto-close modal if there are errors to show
+      if (data.data.failed === 0) {
+        resetForms();
+        onClose();
+        onSuccess?.();
+      }
     },
     onError: (error: any) => {
       // Check if error is due to batch being full (402 status code)
@@ -141,6 +144,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
     });
     setCsvFile(null);
     setSelectedBatchForCsv("");
+    setShowErrorDetails(false);
   };
 
   const handleCandidateSubmit = (e: React.FormEvent) => {
@@ -329,6 +333,68 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
             ) : (
               /* CSV Upload Form */
               <form onSubmit={handleCsvUpload} className="space-y-4">
+                {/* Error/Success Messages at the top */}
+                {uploadCsvMutation.isError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
+                    {uploadCsvMutation.error instanceof Error 
+                      ? uploadCsvMutation.error.message 
+                      : 'Failed to upload CSV'}
+                  </div>
+                )}
+
+                {uploadCsvMutation.isSuccess && uploadCsvMutation.data && (
+                  <div className="space-y-3">
+                    {/* Summary */}
+                    <div className={`p-3 rounded-lg text-sm ${
+                      uploadCsvMutation.data.data.failed === 0
+                        ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                        : uploadCsvMutation.data.data.successful === 0
+                        ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                        : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                    }`}>
+                      <p className="font-medium">
+                        {uploadCsvMutation.data.data.successful === uploadCsvMutation.data.data.total_rows
+                          ? `✓ Successfully uploaded all ${uploadCsvMutation.data.data.successful} candidates`
+                          : uploadCsvMutation.data.data.successful === 0
+                          ? `✗ Failed to upload all ${uploadCsvMutation.data.data.failed} candidates`
+                          : `⚠ Partially uploaded: ${uploadCsvMutation.data.data.successful} succeeded, ${uploadCsvMutation.data.data.failed} failed`
+                        }
+                      </p>
+                    </div>
+
+                    {/* Error Details - Collapsible */}
+                    {uploadCsvMutation.data.data.errors && uploadCsvMutation.data.data.errors.length > 0 && (
+                      <div className="rounded-lg overflow-hidden bg-red-50 dark:bg-red-900/20">
+                        <button
+                          type="button"
+                          onClick={() => setShowErrorDetails(!showErrorDetails)}
+                          className="w-full p-3 flex items-center justify-between text-left hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                        >
+                          <span className="text-sm font-medium text-red-900 dark:text-red-300">
+                            Upload Errors ({uploadCsvMutation.data.data.errors.length})
+                          </span>
+                          <ChevronDownIcon
+                            className={`w-5 h-5 text-red-700 dark:text-red-400 transition-transform fill-current ${
+                              showErrorDetails ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                        {showErrorDetails && (
+                          <div className="px-3 pb-3">
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {uploadCsvMutation.data.data.errors.map((error, index) => (
+                                <div key={index} className="text-xs text-red-700 dark:text-red-400 py-1">
+                                  <span className="font-medium">Row {error.row}</span> ({error.email}): {error.error}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Select Batch (Optional)
@@ -425,23 +491,6 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                   </ul>
                 </div>
 
-                {uploadCsvMutation.isError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
-                    {uploadCsvMutation.error instanceof Error 
-                      ? uploadCsvMutation.error.message 
-                      : 'Failed to upload CSV'}
-                  </div>
-                )}
-
-                {uploadCsvMutation.isSuccess && uploadCsvMutation.data && (
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm">
-                    Successfully uploaded {uploadCsvMutation.data.data.uploaded} candidates
-                    {uploadCsvMutation.data.data.failed > 0 && 
-                      ` (${uploadCsvMutation.data.data.failed} failed)`
-                    }
-                  </div>
-                )}
-
                 <div className="flex justify-end gap-3 pt-4">
                   <Button
                     type="button"
@@ -455,7 +504,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: AddCan
                     type="submit"
                     variant="primary"
                     size="md"
-                    disabled={!csvFile || !selectedBatchForCsv || uploadCsvMutation.isPending}
+                    disabled={!csvFile || uploadCsvMutation.isPending}
                   >
                     {uploadCsvMutation.isPending ? 'Uploading...' : 'Upload CSV'}
                   </Button>
