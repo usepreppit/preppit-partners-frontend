@@ -48,7 +48,7 @@ export default function ExamDetailsModal({ isOpen, onClose, examId }: ExamDetail
               {exam?.title || 'Exam Questions'}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {questions.length} questions • {exam?.duration_minutes} minutes
+              {questions.length} questions • {exam?.durationMinutes} minutes
             </p>
           </div>
           <button

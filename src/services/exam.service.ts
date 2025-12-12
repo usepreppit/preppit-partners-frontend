@@ -5,14 +5,19 @@ export interface Exam {
   _id: string;
   title: string;
   description: string;
-  category: string;
-  difficulty: 'easy' | 'medium' | 'hard';
-  duration_minutes: number;
-  total_questions: number;
-  passing_score: number;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  type: string;
+  durationMinutes: number;
+  scenarioCount: number;
+  status: 'draft' | 'published' | 'archived';
+  studentsJoined: number;
+  sim_name: string;
+  slug: string;
+  tags: string[];
+  isRandomized: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
 }
 
 export interface Question {
@@ -52,10 +57,14 @@ export interface ExamsResponse {
   message: string;
   data: {
     exams: Exam[];
-    total: number;
-    page: number;
-    limit: number;
-    total_pages: number;
+    pagination: {
+      current_page: number;
+      per_page: number;
+      total: number;
+      total_pages: number;
+      has_next: boolean;
+      has_previous: boolean;
+    };
   };
   metadata: Record<string, any>;
   timestamp: string;

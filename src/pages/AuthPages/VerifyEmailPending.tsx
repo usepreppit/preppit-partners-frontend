@@ -1,9 +1,36 @@
+import { useState } from "react";
+import { useSearchParams, Link } from "react-router";
+import { useMutation } from "@tanstack/react-query";
 import GridShape from "../../components/common/GridShape";
-import { Link } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
 import { MailIcon } from "../../icons";
+import { authService } from "../../services/auth.service";
 
 export default function VerifyEmailPending() {
+  const [searchParams] = useSearchParams();
+  const email = searchParams.get("email") || "";
+  const [resendMessage, setResendMessage] = useState("");
+
+  const resendMutation = useMutation({
+    mutationFn: () => authService.resendVerification(email),
+    onSuccess: (response) => {
+      setResendMessage(response.message || "Verification email sent successfully!");
+      setTimeout(() => setResendMessage(""), 5000);
+    },
+    onError: (error: any) => {
+      setResendMessage(error.response?.data?.message || "Failed to resend email. Please try again.");
+      setTimeout(() => setResendMessage(""), 5000);
+    },
+  });
+
+  const handleResend = () => {
+    if (email) {
+      resendMutation.mutate();
+    } else {
+      setResendMessage("Email address not found. Please register again.");
+    }
+  };
+
   return (
     <>
       <PageMeta
@@ -24,15 +51,35 @@ export default function VerifyEmailPending() {
           </h1>
 
           <p className="mt-6 mb-6 text-base text-gray-700 dark:text-gray-400 sm:text-lg">
-            We've sent a verification link to your email address. 
+            We've sent a verification link to {email ? <strong>{email}</strong> : "your email address"}. 
             Please click on the link to activate your account and get started.
           </p>
+
+          {resendMessage && (
+            <div className={`p-4 mb-6 rounded-lg border ${
+              resendMessage.includes("successfully") || resendMessage.includes("sent")
+                ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+            }`}>
+              <p className={`text-sm ${
+                resendMessage.includes("successfully") || resendMessage.includes("sent")
+                  ? "text-green-800 dark:text-green-200"
+                  : "text-red-800 dark:text-red-200"
+              }`}>
+                {resendMessage}
+              </p>
+            </div>
+          )}
 
           <div className="p-4 mb-6 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
             <p className="text-sm text-blue-800 dark:text-blue-200">
               <strong>Didn't receive the email?</strong> Check your spam folder or{" "}
-              <button className="font-semibold underline hover:no-underline">
-                resend verification email
+              <button 
+                onClick={handleResend}
+                disabled={resendMutation.isPending || !email}
+                className="font-semibold underline hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resendMutation.isPending ? "sending..." : "resend verification email"}
               </button>
             </p>
           </div>

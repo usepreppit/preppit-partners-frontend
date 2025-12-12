@@ -14,8 +14,8 @@ export default function Exams() {
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const limit = 12;
 
   // Check if onboarding is completed
@@ -39,19 +39,6 @@ export default function Exams() {
     setShowSessionsModal(true);
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'hard':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -64,18 +51,19 @@ export default function Exams() {
   }
 
   const exams = examsData?.data?.exams || [];
-  const totalPages = examsData?.data?.total_pages || 1;
-  const total = examsData?.data?.total || 0;
+  const totalPages = examsData?.data?.pagination?.total_pages || 1;
+  const total = examsData?.data?.pagination?.total || 0;
+  const currentPageFromApi = examsData?.data?.pagination?.current_page || currentPage;
 
   // Filter exams
   const filteredExams = exams.filter((exam) => {
-    const categoryMatch = filterCategory === 'all' || exam.category === filterCategory;
-    const difficultyMatch = filterDifficulty === 'all' || exam.difficulty === filterDifficulty;
-    return categoryMatch && difficultyMatch;
+    const typeMatch = filterType === 'all' || exam.type === filterType;
+    const statusMatch = filterStatus === 'all' || exam.status === filterStatus;
+    return typeMatch && statusMatch;
   });
 
-  // Get unique categories
-  const categories = Array.from(new Set(exams.map((e) => e.category)));
+  // Get unique types
+  const examTypes = Array.from(new Set(exams.map((e) => e.type).filter(Boolean)));
 
   return (
     <>
@@ -112,9 +100,9 @@ export default function Exams() {
                 <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Active Exams</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Published Exams</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {exams.filter((e) => e.is_active).length}
+                  {exams.filter((e) => e.status === 'published').length}
                 </p>
               </div>
             </div>
@@ -126,9 +114,9 @@ export default function Exams() {
                 <FileIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Categories</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Total Scenarios</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {categories.length}
+                  {exams.reduce((sum, e) => sum + (e.scenarioCount || 0), 0)}
                 </p>
               </div>
             </div>
@@ -140,9 +128,9 @@ export default function Exams() {
                 <UserIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Total Questions</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Students Joined</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {exams.reduce((sum, e) => sum + e.total_questions, 0)}
+                  {exams.reduce((sum, e) => sum + (e.studentsJoined || 0), 0)}
                 </p>
               </div>
             </div>
@@ -154,17 +142,17 @@ export default function Exams() {
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Category:
+                Type:
               </label>
               <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
                 className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                <option value="all">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                <option value="all">All Types</option>
+                {examTypes.map((type, index) => (
+                  <option key={`${type}-${index}`} value={type}>
+                    {type.toUpperCase()}
                   </option>
                 ))}
               </select>
@@ -172,17 +160,17 @@ export default function Exams() {
 
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Difficulty:
+                Status:
               </label>
               <select
-                value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value)}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
-                <option value="all">All Levels</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
+                <option value="all">All Status</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
               </select>
             </div>
 
@@ -227,41 +215,46 @@ export default function Exams() {
 
                   {/* Badges */}
                   <div className="flex flex-wrap gap-2 mb-4">
-                    <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400 rounded">
-                      {exam.category}
-                    </span>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${getDifficultyColor(
-                        exam.difficulty
-                      )}`}
-                    >
-                      {exam.difficulty.charAt(0).toUpperCase() + exam.difficulty.slice(1)}
-                    </span>
-                    {exam.is_active && (
-                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">
-                        Active
+                    {exam.type && (
+                      <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400 rounded">
+                        {exam.type.toUpperCase()}
                       </span>
                     )}
+                    {exam.status === 'published' && (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">
+                        Published
+                      </span>
+                    )}
+                    {exam.status === 'draft' && (
+                      <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">
+                        Draft
+                      </span>
+                    )}
+                    {exam.tags && exam.tags.slice(0, 2).map((tag, idx) => (
+                      <span key={idx} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
+                        {tag}
+                      </span>
+                    ))}
                   </div>
 
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                     <div className="text-center">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Questions</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Scenarios</p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {exam.total_questions}
+                        {exam.scenarioCount || 0}
                       </p>
                     </div>
                     <div className="text-center">
                       <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {exam.duration_minutes}m
+                        {exam.durationMinutes || 0}m
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Pass %</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Students</p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                        {exam.passing_score}%
+                        {exam.studentsJoined || 0}
                       </p>
                     </div>
                   </div>

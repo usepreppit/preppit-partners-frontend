@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router";
+import Landing from "./pages/Landing";
 import Ecommerce from "./pages/Dashboard/Ecommerce";
 import Stocks from "./pages/Dashboard/Stocks";
 import Crm from "./pages/Dashboard/Crm";
@@ -16,6 +17,10 @@ import AccountProfile from "./pages/Partner/AccountProfile";
 import AccountSecurity from "./pages/Partner/AccountSecurity";
 import AccountPayments from "./pages/Partner/AccountPayments";
 import AccountIntegrations from "./pages/Partner/AccountIntegrations";
+import AdminDashboard from "./pages/Admin/AdminDashboard";
+import AdminCandidates from "./pages/Admin/AdminCandidates";
+import AdminExams from "./pages/Admin/AdminExams";
+import AdminExamDetails from "./pages/Admin/AdminExamDetails";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
 import VerifyEmail from "./pages/AuthPages/VerifyEmail";
@@ -71,6 +76,7 @@ import TwoStepVerification from "./pages/AuthPages/TwoStepVerification";
 import SignUpSuccess from "./pages/AuthPages/SignUpSuccess";
 import Success from "./pages/OtherPage/Success";
 import AppLayout from "./layout/AppLayout";
+import AdminLayout from "./layout/AdminLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import TaskList from "./pages/Task/TaskList";
 import Saas from "./pages/Dashboard/Saas";
@@ -85,7 +91,10 @@ export default function App() {
         <AuthProvider>
           <ScrollToTop />
           <Routes>
-            {/* Dashboard Layout - Protected Routes */}
+            {/* Public Landing Page */}
+            <Route path="/" element={<Landing />} />
+
+            {/* Admin Dashboard Layout - Protected Routes */}
             <Route
               element={
                 <ProtectedRoute>
@@ -93,7 +102,21 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index path="/" element={<Ecommerce />} />
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              <Route path="/admin-candidates" element={<AdminCandidates />} />
+              <Route path="/admin-exams" element={<AdminExams />} />
+              <Route path="/admin-exams/:examId" element={<AdminExamDetails />} />
+            </Route>
+
+            {/* Partner Dashboard Layout - Protected Routes */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<Ecommerce />} />
               <Route path="/partner-dashboard" element={<PartnerDashboard />} />
               <Route path="/candidates" element={<Candidates />} />
               <Route path="/billing" element={<Subscriptions />} />

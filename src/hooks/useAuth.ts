@@ -30,8 +30,13 @@ export const useLogin = () => {
       // Store user data in cache
       queryClient.setQueryData(authKeys.currentUser, data.data.user);
       
-      // Navigate to dashboard
-      navigate('/');
+      // Navigate based on account type (default to partner if undefined)
+      const accountType = data.data.user?.account_type || 'partner';
+      if (accountType === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/partner-dashboard');
+      }
     },
   });
 };
@@ -44,13 +49,13 @@ export const useRegister = () => {
 
   return useMutation({
     mutationFn: (userData: RegisterRequest) => authService.register(userData),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       // Don't store token yet - user needs to verify email first
       // Remove token from localStorage if it was stored
       localStorage.removeItem('token');
       
-      // Navigate to verify email pending page
-      navigate('/verify-email-pending');
+      // Navigate to verify email pending page with email as query param
+      navigate(`/verify-email-pending?email=${encodeURIComponent(variables.email)}`);
     },
   });
 };

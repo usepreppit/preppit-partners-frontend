@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 
 import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
+import { useAuth } from "../hooks/useAuth";
 // import { ThemeToggleButton } from "../components/common/ThemeToggleButton";
 // import NotificationDropdown from "../components/header/NotificationDropdown";
 import UserDropdown from "../components/header/UserDropdown";
 
 const AppHeader: React.FC = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
-
+  const { user } = useAuth();
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
   const handleToggle = () => {
@@ -97,6 +98,13 @@ const AppHeader: React.FC = () => {
               width={30}
             />
           </Link>
+
+          {/* Admin Badge */}
+          {user?.account_type === "admin" && (
+            <div className="hidden lg:flex items-center px-3 py-1.5 bg-blue-500/10 text-blue-600 dark:bg-blue-400/10 dark:text-blue-400 text-xs font-semibold rounded-md border border-blue-200 dark:border-blue-800">
+              ADMIN
+            </div>
+          )}
 
           <button
             onClick={toggleApplicationMenu}

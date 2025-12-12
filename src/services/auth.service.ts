@@ -110,4 +110,11 @@ export const authService = {
   updateProfile: async (data: UpdateProfileRequest): Promise<ApiResponse<User>> => {
     return apiService.put<ApiResponse<User>>('/profile/update_profile', data);
   },
+
+  /**
+   * Resend verification email
+   */
+  resendVerification: async (email: string): Promise<ApiResponse<{ message: string }>> => {
+    return apiService.post<ApiResponse<{ message: string }>>('/auth/resend_verification', { email });
+  },
 };

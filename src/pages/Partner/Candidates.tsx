@@ -10,7 +10,7 @@ import CandidateDetailsModal from "../../components/modals/CandidateDetailsModal
 import { candidatesService, Candidate } from "../../services/candidates.service";
 import { PlusIcon, DownloadIcon, ListIcon, UserIcon, EnvelopeIcon } from "../../icons";
 import { useAuth } from "../../hooks/useAuth";
-import { Modal } from "../../components/ui/modal";
+// import { Modal } from "../../components/ui/modal";
 
 export default function Candidates() {
   const { user } = useAuth();
@@ -630,7 +630,7 @@ export default function Candidates() {
           <div className="flex min-h-screen items-center justify-center p-4">
             {/* Backdrop */}
             <div 
-              className="fixed inset-0 bg-black/50 transition-opacity z-[99999]"
+              className="fixed inset-0 bg-black/50 z-[99999]"
               onClick={() => {
                 setIsAssignBatchModalOpen(false);
                 setSelectedBatchForAssignment("");

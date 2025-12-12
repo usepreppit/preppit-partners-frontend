@@ -62,7 +62,34 @@ const partnerNavItems: NavItem[] = [
   },
 ];
 
+// Admin-specific navigation
+const adminNavItems: NavItem[] = [
+  {
+    icon: <GridIcon />,
+    name: "Dashboard",
+    path: "/admin-dashboard",
+  },
+  {
+    icon: <UserIcon />,
+    name: "Candidates",
+    path: "/admin-candidates",
+  },
+  {
+    icon: <FileIcon />,
+    name: "Exams",
+    path: "/admin-exams",
+  },
+];
+
 const partnerAccountItems: NavItem[] = [
+  {
+    icon: <UserCircleIcon />,
+    name: "Account",
+    path: "/account",
+  },
+];
+
+const adminAccountItems: NavItem[] = [
   {
     icon: <UserCircleIcon />,
     name: "Account",
@@ -232,8 +259,9 @@ const AppSidebar: React.FC = () => {
 
   // Determine which navigation items to use based on user account type
   const isPartner = user?.account_type === 'partner';
-  const currentNavItems = isPartner ? partnerNavItems : navItems;
-  const currentAccountItems = isPartner ? partnerAccountItems : supportItems;
+  const isAdmin = user?.account_type === 'admin';
+  const currentNavItems = isAdmin ? adminNavItems : isPartner ? partnerNavItems : navItems;
+  const currentAccountItems = isAdmin ? adminAccountItems : isPartner ? partnerAccountItems : supportItems;
 
   // const isActive = (path: string) => location.pathname === path;
   const isActive = useCallback(
@@ -507,7 +535,7 @@ const AppSidebar: React.FC = () => {
               </h2>
               {renderMenuItems(currentAccountItems, "support")}
             </div>
-            {!isPartner && (
+            {!isPartner && !isAdmin && (
               <div className="">
                 <h2
                   className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
