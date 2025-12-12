@@ -7,7 +7,7 @@ import FeedbackModal from "../components/modals/FeedbackModal";
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
 
 function AdminLayoutContent() {
-  const { isMobileOpen } = useSidebar();
+  const { isMobileOpen: _isMobileOpen } = useSidebar();
   const { isOpen: isFeedbackOpen, closeFeedback } = useFeedback();
 
   return (

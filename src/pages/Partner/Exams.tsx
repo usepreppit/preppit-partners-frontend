@@ -53,7 +53,7 @@ export default function Exams() {
   const exams = examsData?.data?.exams || [];
   const totalPages = examsData?.data?.pagination?.total_pages || 1;
   const total = examsData?.data?.pagination?.total || 0;
-  const currentPageFromApi = examsData?.data?.pagination?.current_page || currentPage;
+
 
   // Filter exams
   const filteredExams = exams.filter((exam) => {

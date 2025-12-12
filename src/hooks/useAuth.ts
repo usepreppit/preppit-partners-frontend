@@ -49,7 +49,7 @@ export const useRegister = () => {
 
   return useMutation({
     mutationFn: (userData: RegisterRequest) => authService.register(userData),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Don't store token yet - user needs to verify email first
       // Remove token from localStorage if it was stored
       localStorage.removeItem('token');

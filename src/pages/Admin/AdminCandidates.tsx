@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import PageMeta from "../../components/common/PageMeta";
-import { candidatesService, Candidate } from "../../services/candidates.service";
+import { candidatesService } from "../../services/candidates.service";
 import { UserIcon, EnvelopeIcon, ListIcon } from "../../icons";
 
 export default function AdminCandidates() {

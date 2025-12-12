@@ -10,7 +10,7 @@ import { PencilIcon } from '../../icons';
 import { authService } from '../../services/auth.service';
 
 export default function AccountProfile() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const { isOpen, openModal, closeModal } = useModal();
   const [formData, setFormData] = useState({
     firstname: user?.firstname || '',
@@ -32,7 +32,6 @@ export default function AccountProfile() {
       return authService.updateProfile(updateData);
     },
     onSuccess: () => {
-      refreshUser();
       closeModal();
     },
   });
