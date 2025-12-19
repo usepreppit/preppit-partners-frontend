@@ -13,7 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
 export default function Subscriptions() {
   const { user } = useAuth();
   const [isCreateSeatModalOpen, setIsCreateSeatModalOpen] = useState(false);
-  const [selectedBatchForPurchase, setSelectedBatchForPurchase] = useState<{ id: string; name: string } | null>(null);
+  const [selectedBatchForPurchase, setSelectedBatchForPurchase] = useState<{ id: string; name: string; existing_seats?: number; sessions_per_day?: number; subscription_months?: number; subscription_id?: string; subscription_end_date?: string; session_id?: string; seat_id?: string; is_updating?: boolean } | null>(null);
   const [isUpdateAddressModalOpen, setIsUpdateAddressModalOpen] = useState(false);
   const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -299,7 +299,21 @@ export default function Subscriptions() {
                     <div className="flex flex-col gap-2">
                       <Button
                         onClick={() => {
-                          setSelectedBatchForPurchase({ id: seat.batch_id, name: seat.batch_name });
+                          const startDate = new Date(seat.start_date);
+                          const endDate = new Date(seat.end_date);
+                          const monthsDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                          setSelectedBatchForPurchase({ 
+                            id: seat.batch_id, 
+                            name: seat.batch_name,
+                            existing_seats: seat.seat_count,
+                            sessions_per_day: seat.sessions_per_day,
+                            subscription_months: monthsDiff,
+                            subscription_id: seat.subscription_id,
+                            subscription_end_date: seat.end_date,
+                            session_id: seat.session_id,
+                            seat_id: seat._id,
+                            is_updating: true
+                          });
                           setIsCreateSeatModalOpen(true);
                         }}
                         variant="outline"
@@ -559,6 +573,14 @@ export default function Subscriptions() {
           batchName={selectedBatchForPurchase.name || ''}
           isNewBatch={!selectedBatchForPurchase.id}
           minSeats={10}
+          existingSeats={selectedBatchForPurchase.existing_seats}
+          existingSessionsPerDay={selectedBatchForPurchase.sessions_per_day}
+          existingSubscriptionMonths={selectedBatchForPurchase.subscription_months}
+          subscriptionId={selectedBatchForPurchase.subscription_id}
+          subscriptionEndDate={selectedBatchForPurchase.subscription_end_date}
+          sessionId={selectedBatchForPurchase.session_id}
+          seatId={selectedBatchForPurchase.seat_id}
+          isUpdating={selectedBatchForPurchase.is_updating}
           onClose={() => {
             setIsCreateSeatModalOpen(false);
             setSelectedBatchForPurchase(null);

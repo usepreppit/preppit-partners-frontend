@@ -8,10 +8,10 @@ interface GuestRouteProps {
 
 /**
  * GuestRoute component - Restricts access to non-authenticated users only
- * Redirects authenticated users to dashboard
+ * Redirects authenticated users to dashboard based on account type
  */
 export default function GuestRoute({ children }: GuestRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -22,9 +22,11 @@ export default function GuestRoute({ children }: GuestRouteProps) {
     );
   }
 
-  // Redirect to dashboard if already authenticated
+  // Redirect to appropriate dashboard if already authenticated
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    const accountType = (user?.account_type || 'partner').toLowerCase();
+    const dashboardPath = accountType === 'admin' ? '/admin-dashboard' : '/partner-dashboard';
+    return <Navigate to={dashboardPath} replace />;
   }
 
   // Render guest content (login, signup, etc.)

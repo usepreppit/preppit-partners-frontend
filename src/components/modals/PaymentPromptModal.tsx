@@ -27,6 +27,14 @@ interface PaymentPromptModalProps {
   batchName?: string; // For display or initial value for new batch
   isNewBatch?: boolean; // True when creating a new batch
   minSeats?: number; // Minimum seats to purchase (default 10 for new, 1 for extend)
+  existingSeats?: number; // Existing seats count for the batch
+  existingSessionsPerDay?: number; // Existing sessions per day (non-editable when adding seats)
+  existingSubscriptionMonths?: number; // Existing subscription duration (non-editable when adding seats)
+  subscriptionId?: string; // Subscription ID for updating seats
+  subscriptionEndDate?: string; // Subscription end date for updating seats
+  sessionId?: string; // Session ID for updating seats
+  seatId?: string; // Seat ID for updating seats
+  isUpdating?: boolean; // Flag to indicate this is an update operation
   onPaymentComplete: () => void;
   onSkip?: () => void;
 }
@@ -38,13 +46,22 @@ export default function PaymentPromptModal({
   batchName = '',
   isNewBatch = false,
   minSeats = 10,
+  existingSeats,
+  existingSessionsPerDay,
+  existingSubscriptionMonths,
+  subscriptionId,
+  subscriptionEndDate,
+  sessionId,
+  seatId,
+  isUpdating = false,
   onPaymentComplete,
   onSkip,
 }: PaymentPromptModalProps) {
   const [newBatchName, setNewBatchName] = useState(batchName);
-  const [selectedMonths, setSelectedMonths] = useState(1); // Default: 1 month
+  const [selectedMonths, setSelectedMonths] = useState(existingSubscriptionMonths || 1); // Default: 1 month
   const [selectedSeats, setSelectedSeats] = useState(minSeats);
-  const [selectedSessionsPerDay, setSelectedSessionsPerDay] = useState(5); // Default: 5 sessions per day
+  const [additionalSeats, setAdditionalSeats] = useState(1); // For adding seats to existing batch
+  const [selectedSessionsPerDay, setSelectedSessionsPerDay] = useState(existingSessionsPerDay || 5); // Default: 5 sessions per day
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [autoRenew, setAutoRenew] = useState(false);
   const [isProcessingStripe, setIsProcessingStripe] = useState(false);
@@ -79,15 +96,22 @@ export default function PaymentPromptModal({
     if (isOpen) {
       setNewBatchName(batchName);
       // Reset to default values when modal opens
-      setSelectedMonths(1);
-      setSelectedSessionsPerDay(5);
-      setSelectedSeats(Math.max(minSeats, 10));
+      if (isNewBatch) {
+        setSelectedMonths(1);
+        setSelectedSessionsPerDay(5);
+        setSelectedSeats(Math.max(minSeats, 10));
+      } else {
+        // For existing batch, use existing values
+        setSelectedMonths(existingSubscriptionMonths || 1);
+        setSelectedSessionsPerDay(existingSessionsPerDay || 5);
+        setAdditionalSeats(1);
+      }
       setAutoRenew(false);
       setShowStripeForm(false);
       setClientSecret('');
       setPaymentIntentId('');
     }
-  }, [isOpen, batchName, minSeats]);
+  }, [isOpen, batchName, minSeats, isNewBatch, existingSessionsPerDay, existingSubscriptionMonths]);
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
@@ -97,10 +121,20 @@ export default function PaymentPromptModal({
   });
 
   // Fetch pricing based on seats, sessions per day, and months
+  const seatsToPrice = isNewBatch ? selectedSeats : additionalSeats;
   const { data: pricingData, isLoading: isPricingLoading } = useQuery({
-    queryKey: ['pricing', selectedSeats, selectedSessionsPerDay, selectedMonths],
-    queryFn: () => paymentService.getPricing(selectedSeats, selectedSessionsPerDay, selectedMonths),
-    enabled: isOpen && selectedSeats >= minSeats,
+    queryKey: ['pricing', seatsToPrice, selectedSessionsPerDay, selectedMonths, isUpdating, subscriptionId, subscriptionEndDate, sessionId, seatId],
+    queryFn: () => paymentService.getPricing(
+      seatsToPrice, 
+      selectedSessionsPerDay, 
+      selectedMonths,
+      isNewBatch ? undefined : isUpdating,
+      isNewBatch ? undefined : subscriptionId,
+      isNewBatch ? undefined : subscriptionEndDate,
+      isNewBatch ? undefined : sessionId,
+      isNewBatch ? undefined : seatId
+    ),
+    enabled: isOpen && (isNewBatch ? selectedSeats >= minSeats : additionalSeats > 0),
     refetchOnMount: true,
     staleTime: 0, // Always fetch fresh pricing
   });
@@ -147,7 +181,7 @@ export default function PaymentPromptModal({
     }
     
     const requestData: any = {
-      seat_count: selectedSeats,
+      seat_count: isNewBatch ? selectedSeats : additionalSeats,
       sessions_per_day: selectedSessionsPerDay,
       months: selectedMonths,
       auto_renew: autoRenew,
@@ -216,13 +250,19 @@ export default function PaymentPromptModal({
       {/* Modal */}
       <div className="relative z-[100001] w-full max-w-2xl mx-4 bg-white dark:bg-gray-900 rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className={`flex items-center justify-between border-b border-gray-200 dark:border-gray-800 ${
+          isNewBatch ? 'p-6' : 'p-4'
+        }`}>
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-                {isNewBatch ? 'Create New Batch with Seats' : `Purchase Seats for ${batchName || 'Batch'}`}
+            <h2 className={`font-bold text-gray-900 dark:text-white ${
+              isNewBatch ? 'text-lg' : 'text-base'
+            }`}>
+                {isNewBatch ? 'Create New Batch with Seats' : `Add Seats to ${batchName}`}
               </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isNewBatch ? 'Set up a new batch with subscription' : `Add ${selectedSeats} seat${selectedSeats > 1 ? 's' : ''} to this batch`}
+            <p className={`text-gray-500 dark:text-gray-400 ${
+              isNewBatch ? 'text-sm' : 'text-xs mt-0.5'
+            }`}>
+              {isNewBatch ? 'Set up a new batch with subscription' : 'Purchase additional seats for this batch'}
             </p>
           </div>
           {!onSkip && (
@@ -274,7 +314,7 @@ export default function PaymentPromptModal({
           )
         ) : (
           // Configuration Form
-          <div className="p-6 space-y-6">
+          <div className={isNewBatch ? 'p-6 space-y-6' : 'p-4 space-y-4'}>
             {/* Batch Name - Only for new batches */}
             {isNewBatch && (
               <div>
@@ -297,163 +337,272 @@ export default function PaymentPromptModal({
 
           {/* Number of Seats */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Number of Seats {minSeats > 1 && `(Minimum ${minSeats})`}
-            </label>
-            <input
-              type="number"
-              min={minSeats}
-              value={selectedSeats}
-              onChange={(e) => setSelectedSeats(Math.max(minSeats, parseInt(e.target.value) || minSeats))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Each seat allows one candidate to practice
-            </p>
+            {isNewBatch ? (
+              <>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Number of Seats {minSeats > 1 && `(Minimum ${minSeats})`}
+                </label>
+                <input
+                  type="number"
+                  min={minSeats}
+                  value={selectedSeats}
+                  onChange={(e) => setSelectedSeats(Math.max(minSeats, parseInt(e.target.value) || minSeats))}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Each seat allows one candidate to practice
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Additional Seats
+                </label>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex justify-between p-2 bg-gray-50 dark:bg-gray-800/50 rounded">
+                      <span className="text-gray-600 dark:text-gray-400">Current:</span>
+                      <span className="font-semibold text-gray-900 dark:text-white">{existingSeats || 0}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                      <span className="text-blue-700 dark:text-blue-300">New Total:</span>
+                      <span className="font-bold text-blue-900 dark:text-blue-100">{(existingSeats || 0) + additionalSeats}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalSeats(Math.max(1, additionalSeats - 1))}
+                      className="flex items-center justify-center w-9 h-9 rounded-lg border-2 border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                      </svg>
+                    </button>
+                    <div className="flex-1 text-center">
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{additionalSeats}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">to add</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalSeats(additionalSeats + 1)}
+                      className="flex items-center justify-center w-9 h-9 rounded-lg border-2 border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Sessions Per Day */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Practice Sessions Per Day
-            </label>
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { value: 3, label: '3 Sessions' },
-                { value: 5, label: '5 Sessions' },
-                { value: 10, label: '10 Sessions' },
-                { value: -1, label: 'Unlimited' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setSelectedSessionsPerDay(option.value)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                    selectedSessionsPerDay === option.value
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
-                  }`}
-                >
-                  <div className={`text-sm font-semibold ${
-                    selectedSessionsPerDay === option.value
-                      ? 'text-blue-700 dark:text-blue-300'
-                      : 'text-gray-900 dark:text-white'
-                  }`}>
-                    {option.value === -1 ? '∞' : option.value}
+          {/* Sessions Per Day and Duration - Side by side for add seats */}
+          {!isNewBatch ? (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Sessions Per Day */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Sessions/Day (Fixed)
+                </label>
+                <div className="p-2.5 bg-gray-100 dark:bg-gray-800/50 rounded-lg border border-gray-300 dark:border-gray-700 text-center">
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">
+                    {selectedSessionsPerDay === -1 ? '\u221e' : selectedSessionsPerDay}
                   </div>
-                  <div className={`text-xs mt-0.5 ${
-                    selectedSessionsPerDay === option.value
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    {option.value === -1 ? 'unlimited' : 'per day'}
-                  </div>
-                </button>
-              ))}
+                </div>
+              </div>
+              
+              {/* Subscription Duration */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                  Duration (Fixed)
+                </label>
+                <div className="p-2.5 bg-gray-100 dark:bg-gray-800/50 rounded-lg border border-gray-300 dark:border-gray-700 text-center">
+                  <div className="text-lg font-bold text-gray-900 dark:text-white">{selectedMonths}mo</div>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Number of practice sessions each candidate can complete per day
-            </p>
-          </div>
+          ) : (
+            <>
+              {/* Sessions Per Day */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Practice Sessions Per Day
+                </label>
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { value: 3, label: '3 Sessions' },
+                    { value: 5, label: '5 Sessions' },
+                    { value: 10, label: '10 Sessions' },
+                    { value: -1, label: 'Unlimited' },
+                  ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSelectedSessionsPerDay(option.value)}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                      selectedSessionsPerDay === option.value
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                    }`}
+                  >
+                    <div className={`text-sm font-semibold ${
+                      selectedSessionsPerDay === option.value
+                        ? 'text-blue-700 dark:text-blue-300'
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {option.value === -1 ? '∞' : option.value}
+                    </div>
+                    <div className={`text-xs mt-0.5 ${
+                      selectedSessionsPerDay === option.value
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {option.value === -1 ? 'unlimited' : 'per day'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Number of practice sessions each candidate can complete per day
+              </p>
+            </div>
 
-          {/* Subscription Duration */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Subscription Duration (Months)
-            </label>
-            <div className="grid grid-cols-4 gap-3">
-              {[1, 3, 6, 12].map((months) => (
-                <button
-                  key={months}
-                  type="button"
-                  onClick={() => setSelectedMonths(months)}
-                  className={`px-4 py-3 rounded-lg border-2 transition-all ${
-                    selectedMonths === months
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
-                      : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
-                  }`}
-                >
-                  <div className={`text-sm font-semibold ${
-                    selectedMonths === months
-                      ? 'text-blue-700 dark:text-blue-300'
-                      : 'text-gray-900 dark:text-white'
-                  }`}>{months}</div>
-                  <div className={`text-xs mt-0.5 ${
-                    selectedMonths === months
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    {months === 1 ? 'month' : 'months'}
-                  </div>
-                </button>
-              ))}
+            {/* Subscription Duration */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Subscription Duration
+              </label>
+              <div className="grid grid-cols-4 gap-3">
+                {[1, 3, 6, 12].map((months) => (
+                  <button
+                    key={months}
+                    type="button"
+                    onClick={() => setSelectedMonths(months)}
+                    className={`px-4 py-3 rounded-lg border-2 transition-all ${
+                      selectedMonths === months
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'border-gray-300 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                    }`}
+                  >
+                    <div className={`text-sm font-semibold ${
+                      selectedMonths === months
+                        ? 'text-blue-700 dark:text-blue-300'
+                        : 'text-gray-900 dark:text-white'
+                    }`}>{months}</div>
+                    <div className={`text-xs mt-0.5 ${
+                      selectedMonths === months
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
+                      {months === 1 ? 'month' : 'months'}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+            </>
+          )}
 
           {/* Auto-Renew */}
-          <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+          <div className={`flex items-center gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg ${
+            isNewBatch ? 'p-4' : 'p-2.5'
+          }`}>
             <input
               type="checkbox"
               id="auto-renew"
               checked={autoRenew}
               onChange={(e) => setAutoRenew(e.target.checked)}
-              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              className={`text-primary-600 border-gray-300 rounded focus:ring-primary-500 ${isNewBatch ? 'w-4 h-4' : 'w-3.5 h-3.5'}`}
             />
-            <label htmlFor="auto-renew" className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-              Enable auto-renewal (automatically renew subscription before expiry)
+            <label htmlFor="auto-renew" className={`text-gray-700 dark:text-gray-300 cursor-pointer ${
+              isNewBatch ? 'text-sm' : 'text-xs'
+            }`}>
+              {isNewBatch ? 'Enable auto-renewal (automatically renew subscription before expiry)' : 'Auto-renew subscription'}
             </label>
           </div>
 
           {/* Summary */}
-          <div className="rounded-lg bg-gray-50 dark:bg-gray-800/50 p-4">
-            <div className="text-sm text-gray-700 dark:text-gray-300">
-              <span className="font-semibold">{selectedSeats} seat{selectedSeats > 1 ? 's' : ''}</span>
+          <div className={`rounded-lg p-4 ${
+            isNewBatch ? 'bg-gray-50 dark:bg-gray-800/50' : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-2.5'
+          }`}>
+            <div className={isNewBatch ? 'text-sm text-gray-700 dark:text-gray-300' : 'text-xs text-blue-900 dark:text-blue-100'}>
+              <span className="font-semibold">{isNewBatch ? selectedSeats : additionalSeats} {isNewBatch ? '' : 'new '}seat{(isNewBatch ? selectedSeats : additionalSeats) > 1 ? 's' : ''}</span>
               {' × '}
               <span className="font-semibold">
-                {selectedSessionsPerDay === -1 ? 'Unlimited' : selectedSessionsPerDay} session{selectedSessionsPerDay !== 1 && selectedSessionsPerDay !== -1 ? 's' : ''}/day
+                {isNewBatch 
+                  ? `${selectedSessionsPerDay === -1 ? 'Unlimited' : selectedSessionsPerDay} session${selectedSessionsPerDay !== 1 && selectedSessionsPerDay !== -1 ? 's' : ''}/day`
+                  : `${selectedSessionsPerDay === -1 ? '∞' : selectedSessionsPerDay} sessions/day`
+                }
               </span>
               {' × '}
-              <span className="font-semibold">{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
+              <span className="font-semibold">{selectedMonths}{isNewBatch ? ` month${selectedMonths > 1 ? 's' : ''}` : 'mo'}</span>
             </div>
           </div>
 
           {/* Pricing Breakdown */}
           {isPricingLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Calculating price...</p>
+            <div className={`text-center ${isNewBatch ? 'py-8' : 'py-6'}`}>
+              <div className={`animate-spin rounded-full border-b-2 border-primary-600 mx-auto ${isNewBatch ? 'h-8 w-8' : 'h-6 w-6'}`}></div>
+              <p className={`text-gray-500 dark:text-gray-400 mt-2 ${isNewBatch ? 'text-sm' : 'text-xs'}`}>{isNewBatch ? 'Calculating price...' : 'Calculating...'}</p>
             </div>
           ) : pricingData?.data ? (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                Pricing Breakdown
+            <div className={`rounded-lg border border-gray-200 dark:border-gray-800 ${
+              isNewBatch ? 'p-5 space-y-3' : 'p-3'
+            }`}>
+              <h3 className={`font-semibold text-gray-900 dark:text-white ${
+                isNewBatch ? 'text-sm mb-3' : 'text-xs mb-2'
+              }`}>
+                {isNewBatch ? 'Pricing Breakdown' : 'Pricing'}
               </h3>
-              <div className="space-y-2 text-sm">
+              <div className={isNewBatch ? 'space-y-2 text-sm' : 'space-y-1.5 text-xs'}>
+                {isNewBatch ? (
+                  <>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Seats</span>
+                      <span>{selectedSeats}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Sessions Per Day</span>
+                      <span>{selectedSessionsPerDay === -1 ? 'Unlimited' : selectedSessionsPerDay}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Duration</span>
+                      <span>{selectedMonths} month{selectedMonths > 1 ? 's' : ''}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Seats</span>
+                      <span>{additionalSeats}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Sessions Per Day</span>
+                      <span>{existingSessionsPerDay === -1 ? 'Unlimited' : existingSessionsPerDay}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 dark:text-gray-400">
+                      <span>Duration</span>
+                      <span>{existingSubscriptionMonths} month{(existingSubscriptionMonths || 0) > 1 ? 's' : ''}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Seats</span>
-                  <span>{pricingData.data.breakdown.seat_count}</span>
+                  <span>{isNewBatch ? 'Price per Candidate' : 'Per Seat'}</span>
+                  <span>${pricingData.data.per_candidate?.toFixed(2) || '0.00'}</span>
                 </div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Sessions Per Day</span>
-                  <span>{pricingData.data.breakdown.sessions_per_day === -1 ? 'Unlimited' : pricingData.data.breakdown.sessions_per_day}</span>
-                </div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Duration</span>
-                  <span>{pricingData.data.breakdown.months} month{pricingData.data.breakdown.months > 1 ? 's' : ''}</span>
-                </div>
-                <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Price per Candidate</span>
-                  <span>${pricingData.data.per_candidate.toFixed(2)}</span>
-                </div>
-                {pricingData.data.breakdown.volume_discount > 0 && (
+                {pricingData.data.breakdown?.volume_discount > 0 && (
                   <div className="flex justify-between text-green-600 dark:text-green-400">
                     <span>Volume Discount</span>
-                    <span>{pricingData.data.breakdown.volume_discount}%</span>
+                    <span>{isNewBatch ? '' : '-'}{pricingData.data.breakdown.volume_discount}%</span>
                   </div>
                 )}
-                <div className="flex justify-between text-base font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className={`flex justify-between font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700 ${
+                  isNewBatch ? 'text-base pt-2' : 'text-sm pt-1.5'
+                }`}>
                   <span>Total</span>
-                  <span>${pricingData.data.total.toFixed(2)}</span>
+                  <span>${pricingData.data.total?.toFixed(2) || '0.00'}</span>
                 </div>
               </div>
             </div>
@@ -519,11 +668,13 @@ export default function PaymentPromptModal({
 
         {/* Footer - Only show for configuration form, not for Stripe form */}
         {!showStripeForm && (
-          <div className="flex items-center justify-between gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
+          <div className={`flex items-center justify-between gap-3 border-t border-gray-200 dark:border-gray-800 ${
+            isNewBatch ? 'p-6' : 'p-4'
+          }`}>
             <Button
               onClick={onSkip || onClose}
               variant="outline"
-              size="md"
+              size={isNewBatch ? 'md' : 'sm'}
               className="flex-1"
             >
               {onSkip ? 'Skip Payment' : 'Cancel'}
@@ -531,7 +682,7 @@ export default function PaymentPromptModal({
             <Button
               onClick={handlePayment}
               variant="primary"
-              size="md"
+              size={isNewBatch ? 'md' : 'sm'}
               className="flex-1"
               disabled={
                 (hasPaymentMethods && !selectedPaymentMethod) || 
@@ -545,8 +696,8 @@ export default function PaymentPromptModal({
                 : isProcessing 
                   ? (isProcessingStripe ? 'Redirecting to Payment...' : 'Processing...') 
                   : hasPaymentMethods 
-                    ? `Pay $${pricingData?.data?.total?.toFixed(2) || '0.00'}` 
-                    : `Continue to Payment ($${pricingData?.data?.total?.toFixed(2) || '0.00'})`
+                    ? `Pay $${pricingData?.data?.total ? pricingData.data.total.toFixed(2) : '0.00'}` 
+                    : `Continue to Payment ($${pricingData?.data?.total ? pricingData.data.total.toFixed(2) : '0.00'})`
               }
             </Button>
           </div>

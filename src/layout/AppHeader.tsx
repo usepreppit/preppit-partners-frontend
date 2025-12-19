@@ -87,13 +87,13 @@ const AppHeader: React.FC = () => {
           <Link to="/" className="lg:hidden">
             <img
               className="dark:hidden"
-              src="./images/logo/logo-full-usepreppit.png"
+              src="/images/logo/logo-full-usepreppit.png"
               alt="Logo"
               width={100}
             />
             <img
               className="hidden dark:block"
-              src="./images/logo/logo_icon-usepreppit.png"
+              src="/images/logo/logo_icon-usepreppit.png"
               alt="Logo"
               width={30}
             />

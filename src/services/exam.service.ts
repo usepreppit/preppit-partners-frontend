@@ -134,4 +134,62 @@ export const examService = {
     );
     return response.data;
   },
+
+  /**
+   * Get a single scenario by ID
+   */
+  getScenario: async (examId: string, scenarioId: string): Promise<any> => {
+    const response = await apiClient.get(`/exams/${examId}/scenario/${scenarioId}`);
+    return response.data;
+  },
+
+  /**
+   * Update entire scenario
+   */
+  updateScenario: async (examId: string, scenarioId: string, data: any): Promise<any> => {
+    const response = await apiClient.put(`/exams/${examId}/scenario/${scenarioId}`, data);
+    return response.data;
+  },
+
+  /**
+   * Update specific section of a scenario
+   */
+  updateScenarioSection: async (
+    examId: string,
+    scenarioId: string,
+    section: string,
+    data: any
+  ): Promise<any> => {
+    const response = await apiClient.patch(
+      `/exams/${examId}/scenarios/${scenarioId}/section`,
+      { section, data }
+    );
+    return response.data;
+  },
+
+  /**
+   * Upload a reference file for a scenario
+   */
+  uploadReference: async (
+    examId: string,
+    scenarioId: string,
+    file: File,
+    referenceName: string
+  ): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('reference_name', referenceName);
+    formData.append('public_access', 'true');
+    
+    const response = await apiClient.post(
+      `/exams/${examId}/scenario/${scenarioId}/upload-reference`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
 };

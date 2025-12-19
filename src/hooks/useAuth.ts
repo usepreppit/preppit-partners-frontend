@@ -23,19 +23,34 @@ export const useLogin = () => {
 
   return useMutation({
     mutationFn: (credentials: LoginRequest) => authService.login(credentials),
-    onSuccess: (data) => {
-      // Invalidate and refetch user data
-      queryClient.invalidateQueries({ queryKey: authKeys.currentUser });
-      
-      // Store user data in cache
-      queryClient.setQueryData(authKeys.currentUser, data.data.user);
-      
-      // Navigate based on account type (default to partner if undefined)
-      const accountType = data.data.user?.account_type || 'partner';
-      if (accountType === 'admin') {
-        navigate('/admin-dashboard');
-      } else {
-        navigate('/partner-dashboard');
+    onSuccess: async () => {
+      try {
+        // Fetch user data from /me endpoint
+        const userResponse = await authService.getCurrentUser();
+        const userData = userResponse.data;
+        
+        console.log('Login successful, user data:', userData);
+        console.log('Account type:', userData?.account_type);
+        
+        // Store user data in cache first
+        queryClient.setQueryData(authKeys.currentUser, userData);
+        
+        // Navigate based on account type (default to partner if undefined)
+        const accountType = (userData?.account_type || 'partner').toLowerCase();
+        console.log('Navigating to:', accountType === 'admin' ? '/admin-dashboard' : '/partner-dashboard');
+        
+        if (accountType === 'admin') {
+          navigate('/admin-dashboard', { replace: true });
+        } else {
+          navigate('/partner-dashboard', { replace: true });
+        }
+        
+        // Invalidate queries after navigation to avoid conflicts
+        await queryClient.invalidateQueries({ queryKey: authKeys.currentUser });
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        // If fetching user data fails, still try to navigate to partner dashboard
+        navigate('/partner-dashboard', { replace: true });
       }
     },
   });

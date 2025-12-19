@@ -69,6 +69,8 @@ export interface Seat {
   paid_candidates: number;
   unpaid_candidates: number;
   seats_available: number;
+  subscription_id?: string; // Stripe subscription ID
+  session_id?: string; // Session ID for the subscription
 }
 
 export interface PurchaseSeatsRequest {
@@ -183,11 +185,32 @@ export const paymentService = {
   getPricing: async (
     seats: number, 
     sessionsPerDay: number,
-    months: number
+    months: number,
+    isUpdating?: boolean,
+    subscriptionId?: string,
+    subscriptionEndDate?: string,
+    sessionId?: string,
+    seatId?: string
   ): Promise<PricingResponse> => {
-    const response = await apiClient.get<PricingResponse>(
-      `/subscriptions/seats/pricing?seat_count=${seats}&sessions_per_day=${sessionsPerDay}&months=${months}`
-    );
+    let url = `/subscriptions/seats/pricing?seat_count=${seats}&sessions_per_day=${sessionsPerDay}&months=${months}`;
+    
+    if (isUpdating) {
+      url += `&is_updating=true`;
+    }
+    if (subscriptionEndDate) {
+      url += `&subscription_end_date=${encodeURIComponent(subscriptionEndDate)}`;
+    }
+    if (subscriptionId) {
+      url += `&subscription_id=${subscriptionId}`;
+    }
+    if (sessionId) {
+      url += `&session_id=${sessionId}`;
+    }
+    if (seatId) {
+      url += `&seat_id=${seatId}`;
+    }
+    
+    const response = await apiClient.get<PricingResponse>(url);
     return response.data;
   },
 

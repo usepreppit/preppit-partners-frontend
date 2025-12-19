@@ -1,8 +1,20 @@
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import PageMeta from '../components/common/PageMeta';
 import Button from '../components/ui/button/Button';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Landing() {
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const getDashboardPath = () => {
+    if (!user) return '/signin';
+    return user.account_type === 'admin' ? '/admin-dashboard' : '/partner-dashboard';
+  };
+
+  const handleDashboardClick = () => {
+    navigate(getDashboardPath());
+  };
   return (
     <>
       <PageMeta 
@@ -26,16 +38,24 @@ export default function Landing() {
 
               {/* Navigation Links */}
               <div className="flex items-center gap-4">
-                <Link to="/signin">
-                  <Button variant="outline" size="md">
-                    Sign In
+                {isAuthenticated ? (
+                  <Button variant="primary" size="md" onClick={handleDashboardClick}>
+                    Dashboard
                   </Button>
-                </Link>
-                <Link to="/signup">
-                  <Button variant="primary" size="md">
-                    Get Started
-                  </Button>
-                </Link>
+                ) : (
+                  <>
+                    <Link to="/signin">
+                      <Button variant="outline" size="md">
+                        Sign In
+                      </Button>
+                    </Link>
+                    <Link to="/signup">
+                      <Button variant="primary" size="md">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -58,16 +78,24 @@ export default function Landing() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link to="/signup">
-                <Button variant="primary" size="md" className="px-8 py-3">
-                  Get Started Today
+              {isAuthenticated ? (
+                <Button variant="primary" size="md" className="px-8 py-3" onClick={handleDashboardClick}>
+                  Go to Dashboard
                 </Button>
-              </Link>
-              <Link to="/signin">
-                <Button variant="outline" size="md" className="px-8 py-3">
-                  Partner Sign In
-                </Button>
-              </Link>
+              ) : (
+                <>
+                  <Link to="/signup">
+                    <Button variant="primary" size="md" className="px-8 py-3">
+                      Get Started Today
+                    </Button>
+                  </Link>
+                  <Link to="/signin">
+                    <Button variant="outline" size="md" className="px-8 py-3">
+                      Partner Sign In
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -136,11 +164,17 @@ export default function Landing() {
               <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                 Ready to Transform Your Training Program?
               </h4>
-              <Link to="/signup">
-                <Button variant="primary" size="md" className="px-8 py-3">
-                  Get Started
+              {isAuthenticated ? (
+                <Button variant="primary" size="md" className="px-8 py-3" onClick={handleDashboardClick}>
+                  Go to Dashboard
                 </Button>
-              </Link>
+              ) : (
+                <Link to="/signup">
+                  <Button variant="primary" size="md" className="px-8 py-3">
+                    Get Started
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>

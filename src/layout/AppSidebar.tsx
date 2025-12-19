@@ -244,7 +244,7 @@ const supportItems: NavItem[] = [
 ];
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleMobileSidebar } = useSidebar();
   const location = useLocation();
   const { user } = useAuth();
 
@@ -310,6 +310,13 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
+  const handleNavClick = () => {
+    // Close mobile sidebar when a navigation item is clicked on mobile
+    if (isMobileOpen && window.innerWidth < 1024) {
+      toggleMobileSidebar();
+    }
+  };
+
   const handleSubmenuToggle = (
     index: number,
     menuType: "main" | "support" | "others"
@@ -373,6 +380,7 @@ const AppSidebar: React.FC = () => {
             nav.path && (
               <Link
                 to={nav.path}
+                onClick={handleNavClick}
                 className={`menu-item group ${
                   isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
@@ -410,6 +418,7 @@ const AppSidebar: React.FC = () => {
                   <li key={subItem.name}>
                     <Link
                       to={subItem.path}
+                      onClick={handleNavClick}
                       className={`menu-dropdown-item ${
                         isActive(subItem.path)
                           ? "menu-dropdown-item-active"
